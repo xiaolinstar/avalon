@@ -179,12 +179,12 @@ public class RoomService {
 
     @Cacheable(value = "roomPlayers", key = "#roomCode", unless = "#result == null")
     public RoomPlayersResponse getRoomPlayers(String roomCode) {
-        // 优化查询：一次性获取房间和玩家信息，避免N+1问题
+        // 优化查询：一次性获取房间和玩家信息，避免 N+1 问题
         Room room = roomRepository.findByRoomCode(roomCode)
             .orElseThrow(() -> new RuntimeException("房间不存在"));
         
         // Try to find an active game for this room
-        Optional<Game> gameOpt = gameRepository.findByRoom(room);
+        Optional<Game> gameOpt = gameRepository.findByRoomId(room.getId());
         
         List<PlayerInfoResponse> players;
         

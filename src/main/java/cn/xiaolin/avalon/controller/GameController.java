@@ -32,9 +32,18 @@ public class GameController {
     @PostMapping("/{roomId}/start")
     public ResponseEntity<ApiResponse<String>> startGame(@PathVariable UUID roomId) {
         try {
-            Game game = gameService.getGameByRoomId(roomId);
-            gameService.startGame(game.getId());
+            gameService.startGame(roomId);
             return ResponseEntity.ok(ApiResponse.success("游戏开始成功"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+        }
+    }
+
+    @PostMapping("/{gameId}/start-first-quest")
+    public ResponseEntity<ApiResponse<String>> startFirstQuest(@PathVariable UUID gameId) {
+        try {
+            gameService.startFirstQuest(gameId);
+            return ResponseEntity.ok(ApiResponse.success("第一个任务开始成功"));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
         }

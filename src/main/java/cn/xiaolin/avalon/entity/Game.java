@@ -29,7 +29,7 @@ public class Game {
     @Column(name = "current_round", nullable = false)
     private Integer currentRound = 1;
 
-    @Column(name = "game_config", columnDefinition = "jsonb")
+    @Column(name = "game_config")
     private String gameConfig;
 
     @Column(length = 10)

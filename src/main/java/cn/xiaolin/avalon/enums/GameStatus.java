@@ -5,6 +5,7 @@ import lombok.Getter;
 @Getter
 public enum GameStatus {
     PREPARING("preparing"),
+    ROLE_VIEWING("role_viewing"),
     PLAYING("playing"),
     ENDED("ended");
 
@@ -13,5 +14,4 @@ public enum GameStatus {
     GameStatus(String value) {
         this.value = value;
     }
-
 }

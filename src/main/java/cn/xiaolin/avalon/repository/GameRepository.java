@@ -12,8 +12,5 @@ import java.util.UUID;
 
 @Repository
 public interface GameRepository extends JpaRepository<Game, UUID> {
-    Optional<Game> findByRoom(Room room);
-    
-    @Query("SELECT g FROM Game g JOIN FETCH g.room WHERE g = :game")
-    Optional<Game> findByRoomWithRoom(@Param("game") Game game);
+    Optional<Game> findByRoomId(UUID roomId);
 }

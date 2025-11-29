@@ -3,7 +3,9 @@ package cn.xiaolin.avalon.service;
 import cn.xiaolin.avalon.entity.*;
 import cn.xiaolin.avalon.enums.*;
 import cn.xiaolin.avalon.repository.*;
+import cn.xiaolin.avalon.websocket.GameMessage;
 import lombok.RequiredArgsConstructor;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,9 +23,11 @@ public class GameService {
     private final GamePlayerRepository gamePlayerRepository;
     private final QuestRepository questRepository;
     private final RoomRepository roomRepository;
+    private final RoomPlayerRepository roomPlayerRepository;
     private final UserRepository userRepository;
     private final VoteRepository voteRepository;
     private final QuestResultRepository questResultRepository;
+    private final SimpMessagingTemplate messagingTemplate;
 
     // 角色配置
     private static final Map<Integer, List<String>> ROLE_CONFIGS = Map.of(
@@ -62,33 +66,99 @@ public class GameService {
     }
 
     @Transactional
-    public void startGame(UUID gameId) {
-        Game game = gameRepository.findById(gameId)
-            .orElseThrow(() -> new RuntimeException("游戏不存在"));
-
-        // 获取房间中的所有玩家
-        Room room = game.getRoom();
-        List<User> players = List.of(room.getCreator()); // 这里需要扩展为获取房间中的所有玩家
+    public void startGame(UUID roomId) {
+        // 检查房间是否已经有游戏存在
+        Optional<Game> existingGameOpt = gameRepository.findByRoomId(roomId);
         
+        // 如果已有游戏且游戏正在进行中，则返回错误
+        if (existingGameOpt.isPresent()) {
+            Game existingGame = existingGameOpt.get();
+            if (!Objects.equals(existingGame.getStatus(), GameStatus.ENDED.getValue())) {
+                throw new RuntimeException("游戏已开始");
+            }
+        }
+        
+        // 获取房间信息
+        Room room = roomRepository.findById(roomId)
+            .orElseThrow(() -> new RuntimeException("房间不存在"));
+
+        room.setStatus(RoomStatus.PLAYING.getValue());
+        roomRepository.save(room);
+
+        // 获取房间中的所有活跃玩家
+        List<RoomPlayer> roomPlayers = roomPlayerRepository.findByRoomIdAndIsActiveTrue(room.getId());
+        List<User> players = roomPlayers.stream()
+                .map(RoomPlayer::getUser)
+                .collect(Collectors.toList());
+
         if (players.size() < 5 || players.size() > 10) {
             throw new RuntimeException("游戏人数必须在5-10人之间");
         }
 
-        // 分配角色
+        // 创建新游戏并保存
+        Game game = new Game();
+        game.setRoom(room);
+        game.setStatus(GameStatus.ROLE_VIEWING.getValue());
+        game.setStartedAt(LocalDateTime.now());
+        game = gameRepository.save(game);
+
+        // 分配角色，并将角色信息存储到数据库
         assignRoles(game, players);
 
-        // 创建任务
-        createQuests(game, players.size());
+        // 发送WebSocket消息通知所有玩家游戏已开始，可以查看角色
+        GameMessage message = new GameMessage();
+        message.setType("GAME_STARTED");
+        message.setGameId(game.getId());
+        message.setRoomId(room.getId());
+        message.setContent("游戏已开始，请查看您的角色");
+        message.setTimestamp(System.currentTimeMillis());
+        
+        messagingTemplate.convertAndSend("/topic/room/" + room.getId(), message);
+    }
 
+    /**
+     * 开始第一个任务，当所有玩家都查看完角色后调用
+     */
+    @Transactional
+    public void startFirstQuest(UUID gameId) {
+        Game game = gameRepository.findById(gameId)
+            .orElseThrow(() -> new RuntimeException("游戏不存在"));
+
+        // 确保游戏处于正确的状态
+        if (!game.getStatus().equals(GameStatus.ROLE_VIEWING.getValue())) {
+            throw new RuntimeException("游戏状态不正确，无法开始第一个任务");
+        }
+
+        // 获取玩家数量
+        List<GamePlayer> gamePlayers = gamePlayerRepository.findByGame(game);
+        int playerCount = gamePlayers.size();
+
+        // 创建任务
+        createQuests(game, playerCount);
+
+        // 设置第一个任务的队长
+        Quest firstQuest = questRepository.findByGameOrderByRoundNumber(game).get(0);
+        firstQuest.setLeader(gamePlayers.get(0).getUser());
+        questRepository.save(firstQuest);
+
+        // 更新游戏状态
         game.setStatus(GameStatus.PLAYING.getValue());
-        game.setStartedAt(LocalDateTime.now());
         gameRepository.save(game);
+
+        // 发送WebSocket消息通知所有玩家第一个任务已开始
+        GameMessage message = new GameMessage();
+        message.setType("FIRST_QUEST_STARTED");
+        message.setGameId(gameId);
+        message.setContent("第一个任务已开始");
+        message.setTimestamp(System.currentTimeMillis());
+        
+        messagingTemplate.convertAndSend("/topic/game/" + gameId, message);
     }
 
     private void assignRoles(Game game, List<User> players) {
         List<String> roles = new ArrayList<>(ROLE_CONFIGS.get(players.size()));
         Collections.shuffle(roles);
-
+        List<GamePlayer> gamePlayerList = new ArrayList<>();
         for (int i = 0; i < players.size(); i++) {
             GamePlayer gamePlayer = new GamePlayer();
             gamePlayer.setGame(game);
@@ -97,9 +167,9 @@ public class GameService {
             gamePlayer.setAlignment(getAlignment(roles.get(i)));
             gamePlayer.setSeatNumber(i + 1);
             gamePlayer.setIsHost(i == 0); // 第一个玩家是房主
-            
-            gamePlayerRepository.save(gamePlayer);
+            gamePlayerList.add(gamePlayer);
         }
+        gamePlayerRepository.saveAll(gamePlayerList);
     }
 
     private void createQuests(Game game, int playerCount) {
@@ -126,10 +196,7 @@ public class GameService {
     }
 
     public Game getGameByRoomId(UUID roomId) {
-        Room room = roomRepository.findById(roomId)
-            .orElseThrow(() -> new RuntimeException("房间不存在"));
-        
-        return gameRepository.findByRoom(room)
+        return gameRepository.findByRoomId(roomId)
             .orElseThrow(() -> new RuntimeException("游戏不存在"));
     }
 
@@ -145,6 +212,12 @@ public class GameService {
             .orElseThrow(() -> new RuntimeException("游戏不存在"));
         
         return questRepository.findByGameOrderByRoundNumber(game);
+    }
+
+    public String getGameStatus(UUID gameId) {
+        Game game = gameRepository.findById(gameId)
+            .orElseThrow(() -> new RuntimeException("游戏不存在"));
+        return game.getStatus();
     }
 
     // 队伍组建相关方法

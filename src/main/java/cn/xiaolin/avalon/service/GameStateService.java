@@ -169,6 +169,8 @@ public class GameStateService {
     private String determineCurrentPhase(Game game, Quest currentQuest) {
         if (game.getStatus().equals(GameStatus.PREPARING.getValue())) {
             return "preparing";
+        } else if (game.getStatus().equals(GameStatus.ROLE_VIEWING.getValue())) {
+            return "role_viewing";
         } else if (game.getStatus().equals(GameStatus.ENDED.getValue())) {
             return "ended";
         } else if (currentQuest == null) {

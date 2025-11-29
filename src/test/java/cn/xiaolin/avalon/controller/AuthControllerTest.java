@@ -39,11 +39,12 @@ public class AuthControllerTest {
         userRepository.deleteAll();
     }
 
+    /**
+     * REG-TC-001: 正常注册
+     * 测试目的: 验证用户可以使用有效的、唯一的凭据成功注册。
+     */
     @Test
     void whenRegisterWithValidData_thenReturnsSuccessAndToken() throws Exception {
-        // REG-TC-001: 正常注册
-        // 测试目的: 验证用户可以使用有效的、唯一的凭据成功注册。
-        
         String lastStr = UUID.randomUUID().toString().substring(0, 8);
         String uniqueUsername = "testuser" + lastStr; // This will be at least 12 characters
         String uniqueEmail = "test_" + lastStr + "@example.com";
@@ -60,11 +61,12 @@ public class AuthControllerTest {
                 .andExpect(jsonPath("$.data.data.token").isString());
     }
 
+    /**
+     * REG-TC-002: 重复用户名注册
+     * 测试目的: 验证系统不允许使用已存在的用户名进行注册。
+     */
     @Test
     void whenRegisterWithDuplicateUsername_thenReturnsError() throws Exception {
-        // REG-TC-002: 重复用户名注册
-        // 测试目的: 验证系统不允许使用已存在的用户名进行注册。
-        
         String lastStr = UUID.randomUUID().toString().substring(0, 6);
         String uniqueUsername = "dupusr" + lastStr; // At least 12 characters, under 20
         String uniqueEmail = "dup_" + lastStr + "@example.com";
@@ -88,11 +90,12 @@ public class AuthControllerTest {
                 .andExpect(jsonPath("$.message").value("用户名已存在"));
     }
 
+    /**
+     * REG-TC-003: 无效邮箱格式注册
+     * 测试目的: 验证后端对邮箱格式的校验是否生效。
+     */
     @Test
     void whenRegisterWithInvalidEmailFormat_thenReturnsError() throws Exception {
-        // REG-TC-003: 无效邮箱格式注册
-        // 测试目的: 验证后端对邮箱格式的校验是否生效。
-        
         String lastStr = UUID.randomUUID().toString().substring(0, 6);
         String uniqueUsername = "invusr" + lastStr; // At least 12 characters, under 20
         RegisterRequest registerRequest = new RegisterRequest(uniqueUsername, "invalid-email", "password123");
@@ -104,11 +107,12 @@ public class AuthControllerTest {
                 // When validation fails, Spring Boot returns 400 with no JSON body
     }
 
+    /**
+     * LOG-TC-001: 正常登录
+     * 测试目的: 验证已注册用户可以使用正确的凭据成功登录并获取 Token。
+     */
     @Test
     void whenLoginWithValidCredentials_thenReturnsSuccessAndToken() throws Exception {
-        // LOG-TC-001: 正常登录
-        // 测试目的: 验证已注册用户可以使用正确的凭据成功登录并获取 Token。
-        
         String lastStr = UUID.randomUUID().toString().substring(0, 6);
         String uniqueUsername = "logusr" + lastStr; // At least 12 characters, under 20
         String uniqueEmail = "log_" + lastStr + "@example.com";
@@ -134,11 +138,12 @@ public class AuthControllerTest {
                 .andExpect(jsonPath("$.data.data.token").isString());
     }
 
+    /**
+     * LOG-TC-002: 错误密码登录
+     * 测试目的: 验证使用错误密码登录时系统会拒绝访问。
+     */
     @Test
     void whenLoginWithInvalidCredentials_thenReturnsError() throws Exception {
-        // LOG-TC-002: 错误密码登录
-        // 测试目的: 验证使用错误密码登录时系统会拒绝访问。
-        
         String lastStr = UUID.randomUUID().toString().substring(0, 6);
         String uniqueUsername = "errusr" + lastStr; // At least 12 characters, under 20
         String uniqueEmail = "err_" + lastStr + "@example.com";
@@ -161,11 +166,12 @@ public class AuthControllerTest {
                 .andExpect(jsonPath("$.message").value("用户名/密码错误"));
     }
 
+    /**
+     * Additional test: 登录不存在的用户
+     * 测试目的: 验证使用不存在的用户名登录时系统会拒绝访问。
+     */
     @Test
     void whenLoginWithNonExistentUser_thenReturnsError() throws Exception {
-        // Additional test: 登录不存在的用户
-        // 测试目的: 验证使用不存在的用户名登录时系统会拒绝访问。
-        
         String uniqueUsername = "nonusr" + UUID.randomUUID().toString().substring(0, 6); // At least 12 characters, under 20
         LoginRequest loginRequest = new LoginRequest(uniqueUsername, "password123");
 
