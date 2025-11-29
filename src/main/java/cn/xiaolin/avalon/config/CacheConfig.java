@@ -21,6 +21,11 @@ import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
+/**
+ * 缓存配置类
+ * 配置Redis缓存管理器，自定义缓存序列化方式和过期时间
+ */
+
 @Configuration
 //@EnableCaching
 public class CacheConfig {

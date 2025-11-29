@@ -181,7 +181,6 @@ public class RoomController {
             List<PlayerInfoResponse> players = playersResponse.getPlayers();
             eventData.put("players", players);
             
-            // 房间信息
             Map<String, Object> roomInfo = new HashMap<>();
             roomInfo.put("currentPlayers", players.size());
             roomInfo.put("maxPlayers", room.getMaxPlayers());

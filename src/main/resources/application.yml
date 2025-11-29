@@ -1,6 +1,6 @@
 spring:
   application:
-    name: avalon
+    name: avalon-backend
   
   datasource:
     url: jdbc:postgresql://localhost:5432/avalon

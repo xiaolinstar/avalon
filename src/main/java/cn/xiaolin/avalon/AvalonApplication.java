@@ -1,3 +1,7 @@
+/**
+ * 阿瓦隆游戏应用主入口类
+ * 负责启动Spring Boot应用程序
+ */
 package cn.xiaolin.avalon;
 
 import org.springframework.boot.SpringApplication;

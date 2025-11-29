@@ -61,7 +61,7 @@ public class AuthService {
 
         // 验证密码
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
-            return new AuthResponse(false, "密码错误", null);
+            return new AuthResponse(false, "用户名/密码错误", null);
         }
 
         // 生成JWT token
