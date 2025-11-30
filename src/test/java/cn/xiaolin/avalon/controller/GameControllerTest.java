@@ -179,14 +179,23 @@ class GameControllerTest {
         // 验证游戏现在处于role_viewing状态
         mockMvc.perform(get("/api/rooms/{roomCode}", roomCode))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.status").value("role_viewing"));
+                .andExpect(jsonPath("$.data.status").value("playing"));
+                
+        // 获取实际的游戏ID
+        String roomResponseStr = mockMvc.perform(get("/api/rooms/{roomCode}", roomCode))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
 
-        // 获取游戏ID (需要通过游戏相关端点获取真实的游戏ID)
-        // 由于游戏已经开始，我们可以通过游戏状态端点获取游戏信息
-        // 但我们已经有了roomId，可以直接使用它来开始第一个任务
+        // 解析响应以获取游戏ID
+        ApiResponse<RoomResponse> roomApiResponse = objectMapper.readValue(roomResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomResponse.class));
+        RoomResponse roomResponse = roomApiResponse.getData();
+        String gameId = roomResponse.getGameId().toString();
         
         // When & Then - 开始第一个任务
-        mockMvc.perform(post("/api/games/{gameId}/start-first-quest", roomId)
+        mockMvc.perform(post("/api/games/{gameId}/start-first-quest", gameId)
                         .header("Authorization", authorizationHeader))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -200,5 +209,102 @@ class GameControllerTest {
         mockMvc.perform(get("/api/rooms/{roomCode}", roomCode))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("playing"));
+    }
+    
+    /**
+     * GAME-ROLE-INFO-TC-001: 成功获取角色信息
+     * 测试目的: 验证玩家可以成功获取自己的角色信息。
+     */
+    @Test
+    void whenPlayerRequestsRoleInfo_thenReturnsRoleInfo() throws Exception {
+        // 首先开始游戏
+        mockMvc.perform(post("/api/games/{roomId}/start", roomId)
+                        .header("Authorization", authorizationHeader))
+                .andExpect(status().isOk());
+
+        // 获取实际的游戏ID
+        // 我们需要先获取房间信息，然后从中提取游戏ID
+        String roomResponseStr = mockMvc.perform(get("/api/rooms/{roomCode}", roomCode))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        // 解析响应以获取游戏ID
+        ApiResponse<RoomResponse> roomApiResponse = objectMapper.readValue(roomResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomResponse.class));
+        RoomResponse roomResponse = roomApiResponse.getData();
+        String gameId = roomResponse.getGameId().toString();
+
+        // When & Then - 获取角色信息
+        mockMvc.perform(get("/api/games/{gameId}/role-info", gameId)
+                        .header("Authorization", authorizationHeader))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("操作成功"))
+                .andExpect(jsonPath("$.data.gameId").value(gameId))
+                .andExpect(jsonPath("$.data.role").isNotEmpty())
+                .andExpect(jsonPath("$.data.roleName").isNotEmpty())
+                .andExpect(jsonPath("$.data.alignment").isNotEmpty())
+                .andExpect(jsonPath("$.data.description").isNotEmpty())
+                .andExpect(jsonPath("$.data.visibilityInfo").isNotEmpty());
+    }
+    
+    /**
+     * GAME-ROLE-INFO-TC-002: 非游戏玩家尝试获取角色信息
+     * 测试目的: 验证未加入游戏的用户无法获取角色信息。
+     */
+    @Test
+    void whenNonPlayerRequestsRoleInfo_thenReturnsError() throws Exception {
+        // 首先开始游戏
+        mockMvc.perform(post("/api/games/{roomId}/start", roomId)
+                        .header("Authorization", authorizationHeader))
+                .andExpect(status().isOk());
+
+        // 获取实际的游戏ID
+        String roomResponseStr = mockMvc.perform(get("/api/rooms/{roomCode}", roomCode))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        // 解析响应以获取游戏ID
+        ApiResponse<RoomResponse> roomApiResponse = objectMapper.readValue(roomResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomResponse.class));
+        RoomResponse roomResponse = roomApiResponse.getData();
+        String gameId = roomResponse.getGameId().toString();
+
+        // 创建一个不属于房间的用户
+        User outsider = new User();
+        outsider.setUsername("outsider_" + UUID.randomUUID().toString().substring(0, 8));
+        outsider.setEmail("outsider_" + UUID.randomUUID().toString().substring(0, 8) + "@example.com");
+        outsider.setPasswordHash("hashed_password");
+        outsider = userRepository.save(outsider);
+        
+        String outsiderToken = jwtUtil.generateToken(outsider.getId(), outsider.getUsername());
+
+        // When & Then - 尝试获取角色信息应该失败
+        mockMvc.perform(get("/api/games/{gameId}/role-info", gameId)
+                        .header("Authorization", "Bearer " + outsiderToken))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value("玩家不在游戏中"));
+    }
+    
+    /**
+     * GAME-ROLE-INFO-TC-003: 使用无效游戏ID获取角色信息
+     * 测试目的: 验证使用无效游戏ID无法获取角色信息。
+     */
+    @Test
+    void whenRequestingRoleInfoWithInvalidGameId_thenReturnsError() throws Exception {
+        // 使用一个格式正确的UUID，但数据库中不存在的游戏ID
+        String invalidGameId = "123e4567-e89b-12d3-a456-426614174000";
+        
+        // When & Then - 使用无效游戏ID获取角色信息应该失败
+        mockMvc.perform(get("/api/games/{gameId}/role-info", invalidGameId)
+                        .header("Authorization", authorizationHeader))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value("游戏不存在"));
     }
 }

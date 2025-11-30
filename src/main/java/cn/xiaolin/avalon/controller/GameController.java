@@ -43,7 +43,7 @@ public class GameController {
     public ResponseEntity<ApiResponse<String>> startFirstQuest(@PathVariable UUID gameId) {
         try {
             gameService.startFirstQuest(gameId);
-            return ResponseEntity.ok(ApiResponse.success("第一个任务开始成功"));
+            return ResponseEntity.ok(ApiResponse.success("第一个任务开始成功", ""));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
         }
@@ -95,6 +95,21 @@ public class GameController {
             
             GameStateResponse gameState = gameStateService.getGameState(gameId, userId);
             return ResponseEntity.ok(ApiResponse.success(gameState));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+        }
+    }
+
+    @GetMapping("/{gameId}/role-info")
+    public ResponseEntity<ApiResponse<RoleInfoResponse>> getRoleInfo(
+            @PathVariable UUID gameId,
+            @RequestHeader("Authorization") String authorizationHeader) {
+        try {
+            String token = authorizationHeader.substring(7); // Remove "Bearer " prefix
+            UUID userId = jwtUtil.getUserIdFromToken(token);
+            
+            RoleInfoResponse roleInfo = gameStateService.getRoleInfo(gameId, userId);
+            return ResponseEntity.ok(ApiResponse.success(roleInfo));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
         }

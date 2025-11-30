@@ -582,3 +582,82 @@
   1. 响应体中 `success` 为 `false`。
   2. 响应体中 `message` 提示人数不足。
 - **后置清理**: 无。
+
+#### **GAME-ROLE-INFO-TC-001: 成功获取角色信息**
+- **测试目的**: 验证已加入游戏的玩家可以成功获取自己的角色信息。
+- **前置条件**:
+  1. 用户 `host` 是房间 `TEST05` 的房主，已登录。
+  2. 房间 `TEST05` 中已有 5 名玩家。
+  3. 游戏已开始，房间状态为 `playing`。
+  4. 玩家已被分配角色。
+- **请求方法/URL**: `GET /api/games/{gameId}/role-info`
+- **请求头**: `Authorization: Bearer <host_token>`
+- **请求参数**: (无)
+- **预期响应**:
+  - `Status Code: 200 OK`
+  - `Body`:
+    ```json
+    {
+      "success": true,
+      "message": "操作成功",
+      "data": {
+        "gameId": "...",
+        "role": "merlin",
+        "roleName": "梅林",
+        "alignment": "正义",
+        "description": "你知道邪恶阵营的所有成员，除了莫德雷德",
+        "visibilityInfo": {
+          "evil": ["player1", "player2"]
+        }
+      }
+    }
+    ```
+- **实际响应验证点**:
+  1. 响应体中 `success` 为 `true`。
+  2. 返回的数据包含玩家的角色代码、名称、阵营和描述。
+  3. 返回的数据包含根据角色规则计算的可见性信息。
+- **后置清理**: 无。
+
+#### **GAME-ROLE-INFO-TC-002: 非游戏玩家尝试获取角色信息**
+- **测试目的**: 验证未加入游戏的用户无法获取角色信息。
+- **前置条件**:
+  1. 用户 `outsider` 已登录，获得有效 Token。
+  2. 游戏 `GAME01` 已存在。
+- **请求方法/URL**: `GET /api/games/{gameId}/role-info`
+- **请求头**: `Authorization: Bearer <outsider_token>`
+- **请求参数**: (无)
+- **预期响应**:
+  - `Status Code: 400 Bad Request`
+  - `Body`:
+    ```json
+    {
+      "success": false,
+      "message": "玩家不在游戏中",
+      "data": null
+    }
+    ```
+- **实际响应验证点**:
+  1. 响应体中 `success` 为 `false`。
+  2. 响应体中 `message` 提示玩家不在游戏中。
+- **后置清理**: 无。
+
+#### **GAME-ROLE-INFO-TC-003: 使用无效游戏ID获取角色信息**
+- **测试目的**: 验证使用无效游戏ID无法获取角色信息。
+- **前置条件**: 用户 `testuser` 已登录，获得有效 Token。
+- **请求方法/URL**: `GET /api/games/invalid-game-id/role-info`
+- **请求头**: `Authorization: Bearer <valid_token>`
+- **请求参数**: (无)
+- **预期响应**:
+  - `Status Code: 400 Bad Request`
+  - `Body`:
+    ```json
+    {
+      "success": false,
+      "message": "游戏不存在",
+      "data": null
+    }
+    ```
+- **实际响应验证点**:
+  1. 响应体中 `success` 为 `false`。
+  2. 响应体中 `message` 提示游戏不存在。
+- **后置清理**: 无。

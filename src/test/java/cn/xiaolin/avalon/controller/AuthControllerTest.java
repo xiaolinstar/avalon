@@ -2,7 +2,6 @@ package cn.xiaolin.avalon.controller;
 
 import cn.xiaolin.avalon.dto.LoginRequest;
 import cn.xiaolin.avalon.dto.RegisterRequest;
-import cn.xiaolin.avalon.entity.User;
 import cn.xiaolin.avalon.repository.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;

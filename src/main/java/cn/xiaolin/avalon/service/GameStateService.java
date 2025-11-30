@@ -1,6 +1,7 @@
 package cn.xiaolin.avalon.service;
 
 import cn.xiaolin.avalon.dto.GameStateResponse;
+import cn.xiaolin.avalon.dto.RoleInfoResponse;
 import cn.xiaolin.avalon.entity.*;
 import cn.xiaolin.avalon.enums.*;
 import cn.xiaolin.avalon.repository.*;
@@ -204,5 +205,44 @@ public class GameStateService {
         }
         
         return currentQuest.getLeader().getId().equals(playerId);
+    }
+
+    /**
+     * 获取玩家的角色信息
+     * @param gameId 游戏ID
+     * @param userId 用户ID
+     * @return 角色信息响应
+     */
+    public RoleInfoResponse getRoleInfo(UUID gameId, UUID userId) {
+        Game game = gameRepository.findById(gameId)
+            .orElseThrow(() -> new RuntimeException("游戏不存在"));
+        
+        // 使用JOIN FETCH预加载用户关联，避免N+1查询
+        List<GamePlayer> players = gamePlayerRepository.findByGameWithUser(game);
+        
+        // 获取当前玩家
+        GamePlayer currentPlayer = players.stream()
+            .filter(p -> p.getUser().getId().equals(userId))
+            .findFirst()
+            .orElseThrow(() -> new RuntimeException("玩家不在游戏中"));
+        
+        // 获取角色枚举
+        Role roleEnum = Arrays.stream(Role.values())
+            .filter(role -> role.getCode().equals(currentPlayer.getRole()))
+            .findFirst()
+            .orElse(Role.LOYAL_SERVANT);
+        
+        // 获取可见性信息
+        Map<String, List<String>> visibility = roleVisibilityService.getVisiblePlayers(currentPlayer, players);
+        
+        // 构建响应对象
+        return new RoleInfoResponse(
+            game.getId(),
+            currentPlayer.getRole(),
+            roleEnum.getName(),
+            currentPlayer.getAlignment(),
+            roleEnum.getDescription(),
+            visibility
+        );
     }
 }

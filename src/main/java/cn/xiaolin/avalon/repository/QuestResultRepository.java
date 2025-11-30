@@ -2,6 +2,8 @@ package cn.xiaolin.avalon.repository;
 
 import cn.xiaolin.avalon.entity.QuestResult;
 import cn.xiaolin.avalon.entity.Game;
+import cn.xiaolin.avalon.entity.Quest;
+import cn.xiaolin.avalon.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -11,8 +13,8 @@ import java.util.List;
 import java.util.UUID;
 
 @Repository
-public interface QuestResultRepository extends JpaRepository<QuestResult, java.util.UUID> {
-    List<QuestResult> findByQuest(cn.xiaolin.avalon.entity.Quest quest);
+public interface QuestResultRepository extends JpaRepository<QuestResult, UUID> {
+    List<QuestResult> findByQuest(Quest quest);
     
     @Query("SELECT qr FROM QuestResult qr WHERE qr.quest.game = :game")
     List<QuestResult> findByGame(@Param("game") Game game);

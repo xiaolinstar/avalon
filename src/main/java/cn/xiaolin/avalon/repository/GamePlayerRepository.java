@@ -13,7 +13,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Repository
-public interface GamePlayerRepository extends JpaRepository<GamePlayer, java.util.UUID> {
+public interface GamePlayerRepository extends JpaRepository<GamePlayer, UUID> {
     List<GamePlayer> findByGame(Game game);
     
     @Query("SELECT gp FROM GamePlayer gp JOIN FETCH gp.user WHERE gp.game = :game")

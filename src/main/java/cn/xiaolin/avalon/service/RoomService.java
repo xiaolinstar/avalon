@@ -70,7 +70,8 @@ public class RoomService {
             savedRoom.getMaxPlayers(),
             savedRoom.getStatus(),
             creator.getUsername(),
-            1  // 新建房间只有创建者1人
+            1,  // 新建房间只有创建者1人
+            null  // 新建房间还没有游戏
         );
     }
 
@@ -86,6 +87,13 @@ public class RoomService {
 
         // 获取当前玩家数量
         int currentPlayerCount = (int) roomPlayerRepository.countActivePlayersByRoomId(room.getId());
+        
+        // 获取游戏ID（如果游戏已开始）
+        UUID gameId = null;
+        Optional<Game> gameOpt = gameRepository.findByRoomId(room.getId());
+        if (gameOpt.isPresent()) {
+            gameId = gameOpt.get().getId();
+        }
 
         return new RoomResponse(
             room.getId(),
@@ -93,7 +101,8 @@ public class RoomService {
             room.getMaxPlayers(),
             room.getStatus(),
             room.getCreator().getUsername(),
-            currentPlayerCount  // 新增：当前玩家数量
+            currentPlayerCount,  // 新增：当前玩家数量
+            gameId  // 新增：游戏ID（如果游戏已开始）
         );
     }
 
@@ -108,6 +117,13 @@ public class RoomService {
 
         // 获取当前玩家数量
         int currentPlayerCount = (int) roomPlayerRepository.countActivePlayersByRoomId(room.getId());
+        
+        // 获取游戏ID（如果游戏已开始）
+        UUID gameId = null;
+        Optional<Game> gameOpt = gameRepository.findByRoomId(room.getId());
+        if (gameOpt.isPresent()) {
+            gameId = gameOpt.get().getId();
+        }
 
         return new RoomResponse(
             room.getId(),
@@ -115,7 +131,8 @@ public class RoomService {
             room.getMaxPlayers(),
             room.getStatus(),
             room.getCreator().getUsername(),
-            currentPlayerCount  // 新增：当前玩家数量
+            currentPlayerCount,  // 新增：当前玩家数量
+            gameId  // 新增：游戏ID（如果游戏已开始）
         );
     }
 
@@ -167,13 +184,21 @@ public class RoomService {
         // 获取更新后的玩家数量
         int updatedPlayerCount = (int) roomPlayerRepository.countActivePlayersByRoomId(room.getId());
         
+        // 获取游戏ID（如果游戏已开始）
+        UUID gameId = null;
+        Optional<Game> gameOpt = gameRepository.findByRoomId(room.getId());
+        if (gameOpt.isPresent()) {
+            gameId = gameOpt.get().getId();
+        }
+
         return new RoomResponse(
             room.getId(),
             room.getRoomCode(),
             room.getMaxPlayers(),
             room.getStatus(),
             room.getCreator().getUsername(),
-            updatedPlayerCount  // 新增：当前玩家数量
+            updatedPlayerCount,  // 新增：当前玩家数量
+            gameId  // 新增：游戏ID（如果游戏已开始）
         );
     }
 
