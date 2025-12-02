@@ -116,9 +116,11 @@ avalon/
 │   └── main/
 │       ├── java/            # Java源代码
 │       └── resources/       # 配置文件
-└── .trae/documents/         # 项目文档
-    ├── avalon_product_requirements.md
-    └── avalon_technical_architecture.md
+└── docs/                    # 项目文档
+    ├── requirements/        # 产品需求文档
+    ├── design/              # 技术设计文档
+    ├── api/                 # API文档
+    └── development/         # 开发指南和流程
 ```
 
 ## 🎯 使用说明

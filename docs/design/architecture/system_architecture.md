@@ -1,3 +1,5 @@
+# 系统架构设计
+
 ## 1. 架构设计
 
 ```mermaid
@@ -45,232 +47,37 @@ graph TD
 | /         | 首页，游戏介绍和入口   |
 | /rooms    | 房间页面，创建和加入房间 |
 | /games    | 游戏页面，进行游戏    |
-| /result   | 结果页面，显示游戏结果  |
 | /profile  | 个人中心，用户信息和历史 |
 | /auth     | 认证授权页面       |
 
-## 4. 数据模型
+## 4. 设计模式应用
 
-### 4.1 数据模型定义
+待办...
 
-```mermaid
-erDiagram
-    USER ||--o{ ROOM_PLAYER : joins
-    ROOM ||--o{ ROOM_PLAYER : contains
-    USER ||--o{ GAME_PLAYER : plays
-    ROOM ||--o{ GAME : hosts
-    GAME ||--o{ GAME_PLAYER : contains
-    GAME ||--o{ QUEST : has
-    QUEST ||--o{ VOTE : contains
-    QUEST ||--o{ QUEST_RESULT : has
+**原型模式（Prototype Pattern）**
+用于角色创建和游戏配置，支持快速复制和定制化：
 
-    USER {
-        uuid id PK
-        string username
-        string email
-        string password_hash
-        int level
-        int experience
-        timestamp created_at
-        timestamp updated_at
-    }
+* `RolePrototype`: 角色原型管理
 
-    ROOM {
-        uuid id PK
-        uuid creator_id FK
-        string room_code
-        int max_players
-        json role_config
-        string status
-        timestamp created_at
-    }
+* `GameConfigPrototype`: 游戏配置原型
 
-    ROOM_PLAYER {
-        uuid id PK
-        uuid room_id FK
-        uuid user_id FK
-        boolean is_host
-        boolean is_active
-        int seat_number
-        timestamp joined_at
-        timestamp updated_at
-    }
+**观察者模式（Observer Pattern）**
+用于游戏状态变更通知：
 
-    GAME {
-        uuid id PK
-        uuid room_id FK
-        string status
-        int current_round
-        json game_config
-        uuid winner
-        timestamp started_at
-        timestamp ended_at
-    }
+* `GameObserver`: 游戏状态观察者
 
-    GAME_PLAYER {
-        uuid id PK
-        uuid game_id FK
-        uuid user_id FK
-        string role
-        string alignment
-        boolean is_host
-        int seat_number
-        boolean is_active
-    }
+* `WebSocketPublisher`: 实时消息推送
 
-    QUEST {
-        uuid id PK
-        uuid game_id FK
-        int round_number
-        int required_players
-        int required_fails
-        string status
-        uuid leader_id
-    }
+**策略模式（Strategy Pattern）**
+用于不同的胜利条件判断：
 
-    VOTE {
-        uuid id PK
-        uuid quest_id FK
-        uuid player_id FK
-        string vote_type
-        timestamp voted_at
-    }
+* `VictoryConditionStrategy`: 胜利条件策略
 
-    QUEST_RESULT {
-        uuid id PK
-        uuid quest_id FK
-        uuid player_id FK
-        boolean success
-        timestamp executed_at
-    }
-```
+* `QuestVictoryStrategy`: 任务胜利策略
 
-### 4.2 数据定义语言
+* `AssassinationVictoryStrategy`: 刺杀胜利策略
 
-**用户表 (users)**
-
-```sql
-CREATE TABLE users (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    username VARCHAR(50) UNIQUE NOT NULL,
-    email VARCHAR(255) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
-    level INTEGER DEFAULT 1,
-    experience INTEGER DEFAULT 0,
-    avatar_url VARCHAR(500),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
-CREATE INDEX idx_users_username ON users(username);
-CREATE INDEX idx_users_email ON users(email);
-```
-
-**房间表 (rooms)**
-
-```sql
-CREATE TABLE rooms (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    creator_id UUID REFERENCES users(id),
-    room_code VARCHAR(10) UNIQUE NOT NULL,
-    max_players INTEGER NOT NULL CHECK (max_players >= 5 AND max_players <= 10),
-    role_config JSONB DEFAULT '{}',
-    status VARCHAR(20) DEFAULT 'waiting' CHECK (status IN ('waiting', 'playing', 'ended')),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
-CREATE INDEX idx_rooms_code ON rooms(room_code);
-CREATE INDEX idx_rooms_status ON rooms(status);
-```
-
-**房间玩家表 (room_players)**
-
-```sql
-CREATE TABLE room_players (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    room_id UUID REFERENCES rooms(id),
-    user_id UUID REFERENCES users(id),
-    is_host BOOLEAN DEFAULT FALSE,
-    is_active BOOLEAN DEFAULT TRUE,
-    seat_number INTEGER,
-    joined_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
-CREATE INDEX idx_room_players_room ON room_players(room_id);
-CREATE INDEX idx_room_players_user ON room_players(user_id);
-CREATE INDEX idx_room_players_active ON room_players(is_active);
-```
-
-**游戏表 (games)**
-
-```sql
-CREATE TABLE games (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    room_id UUID REFERENCES rooms(id),
-    status VARCHAR(20) DEFAULT 'preparing' CHECK (status IN ('preparing', 'playing', 'ended')),
-    current_round INTEGER DEFAULT 1,
-    game_config JSONB DEFAULT '{}',
-    winner VARCHAR(10),
-    started_at TIMESTAMP WITH TIME ZONE,
-    ended_at TIMESTAMP WITH TIME ZONE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
-CREATE INDEX idx_games_room ON games(room_id);
-CREATE INDEX idx_games_status ON games(status);
-```
-
-**游戏玩家表 (game_players)**
-
-```sql
-CREATE TABLE game_players (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    game_id UUID REFERENCES games(id),
-    user_id UUID REFERENCES users(id),
-    role VARCHAR(30) NOT NULL,
-    alignment VARCHAR(10) NOT NULL CHECK (alignment IN ('good', 'evil')),
-    is_host BOOLEAN DEFAULT FALSE,
-    seat_number INTEGER NOT NULL,
-    is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
-CREATE INDEX idx_game_players_game ON game_players(game_id);
-CREATE INDEX idx_game_players_user ON game_players(user_id);
-```
-
-**任务表 (quests)**
-
-```sql
-CREATE TABLE quests (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    game_id UUID REFERENCES games(id),
-    round_number INTEGER NOT NULL,
-    required_players INTEGER NOT NULL,
-    required_fails INTEGER DEFAULT 1,
-    status VARCHAR(20) DEFAULT 'proposing' CHECK (status IN ('proposing', 'voting', 'executing', 'completed', 'failed')),
-    leader_id UUID REFERENCES users(id),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
-CREATE INDEX idx_quests_game ON quests(game_id);
-```
-
-**投票表 (votes)**
-
-```sql
-CREATE TABLE votes (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    quest_id UUID REFERENCES quests(id),
-    player_id UUID REFERENCES users(id),
-    vote_type VARCHAR(10) NOT NULL CHECK (vote_type IN ('approve', 'reject')),
-    voted_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
-CREATE INDEX idx_votes_quest ON votes(quest_id);
-CREATE INDEX idx_votes_player ON votes(player_id);
-```
+***
 
 ## 5. 面向对象分析
 
@@ -281,7 +88,6 @@ CREATE INDEX idx_votes_player ON votes(player_id);
 职能：一局游戏的"状态机 + 规则引擎"。
 
 * 保存整局元数据（id、房间、当前轮次、状态机阶段）
-
 * 负责阶段推进、角色分配、胜负判定、并发写保护（事务）
 
 ```java
@@ -350,6 +156,7 @@ public class RoomPlayer {
 ```
 
 **GamePlayer类（游戏内玩家）**
+
 职能：表示用户在游戏中的状态和游戏相关信息。
 * 负责跟踪用户的游戏中角色、阵营、游戏内状态等信息
 ```java
@@ -392,6 +199,7 @@ public class GamePlayer {
 ```
 
 **Role类（角色系统）**
+
 职能：能把"看见谁"、"能否投失败卡"等**角色差异规则**封装成枚举，方便访问角色属性和规则。
 * 使用枚举类型来定义所有可用角色，每个角色包含其基本属性和规则
 
@@ -421,7 +229,6 @@ public enum Role {
 职能：封装"一轮任务"的完整生命周期数据与规则。
 
 * 保存队长、提案成员、投票记录、任务执行结果
-
 * 提供"投票是否通过""任务成败判定"等无状态计算
 
 ```java
@@ -772,197 +579,3 @@ stateDiagram-v2
    - 前端在游戏状态变为ROLE_VIEWING时，自动调用此方法获取角色信息
    - 角色揭示页显示玩家自己的角色和可见信息
    - 玩家确认查看角色后，可以继续游戏流程
-
-## 7. API定义
-
-### 7.1 用户认证API
-
-**用户注册**
-
-| 名称   | 请求方法 | 路径                   | 说明    |
-| ---- | ---- | -------------------- | ----- |
-| 用户注册 | POST | `/api/auth/register` | 新用户注册 |
-
-请求体（Content-Type: application/json）：
-
-```json
-{
-  "username": "merlin",
-  "email": "merlin@avalon.com",
-  "password": "sword123"
-}
-```
-
-请求参数：
-
-| 参数名      | 参数类型   | 是否必需 | 描述         |
-| -------- | ------ | ---- | ---------- |
-| username | string | 是    | 用户名，3-20字符 |
-| email    | string | 是    | 邮箱地址       |
-| password | string | 是    | 密码，6-20字符  |
-
-响应体（201 Created）：
-
-```json
-{
-  "userId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "username": "merlin",
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-}
-```
-
-**用户登录**
-
-| 名称   | 请求方法 | 路径                | 说明   |
-| ---- | ---- | ----------------- | ---- |
-| 用户登录 | POST | `/api/auth/login` | 用户登录 |
-
-请求体（Content-Type: application/json）：
-
-```json
-{
-  "username": "merlin",
-  "password": "sword123"
-}
-```
-
-请求参数：
-
-| 参数名      | 参数类型   | 是否必需 | 描述     |
-| -------- | ------ | ---- | ------ |
-| username | string | 是    | 用户名或邮箱 |
-| password | string | 是    | 密码     |
-
-响应体（200 OK）：
-
-```json
-{
-  "userId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "username": "merlin",
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-}
-```
-
-### 7.2 房间管理API
-
-**创建房间**
-
-| 名称   | 请求方法 | 路径           | 说明     |
-| ---- | ---- | ------------ | ------ |
-| 创建房间 | POST | `/api/rooms` | 房主创建房间 |
-
-请求体（Content-Type: application/json）：
-
-```json
-{
-  "maxPlayers": 7,
-  "roleConfig": {
-    "merlin": true,
-    "percival": true,
-    "morgana": true,
-    "assassin": true
-  }
-}
-```
-
-请求参数：
-
-| 参数名        | 参数类型    | 是否必需 | 描述         |
-| ---------- | ------- | ---- | ---------- |
-| maxPlayers | integer | 是    | 最大玩家数，5-10 |
-| roleConfig | object  | 否    | 角色配置对象     |
-
-响应体（201 Created）：
-
-```json
-{
-  "roomId": "c5d6e7f8-1234-5678-9abc-def123456789",
-  "roomCode": "A3B9C1",
-  "hostId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "maxPlayers": 7,
-  "roleConfig": { "merlin": true, "percival": true, "morgana": true, "assassin": true },
-  "createdAt": "2025-11-17T12:34:56Z"
-}
-```
-
-**加入房间**
-
-| 名称   | 请求方法 | 路径                         | 说明     |
-| ---- | ---- | -------------------------- | ------ |
-| 加入房间 | POST | `/api/rooms/{roomId}/join` | 玩家加入房间 |
-
-请求参数：无（路径参数 `roomId`）
-
-响应体（200 OK）：
-
-```json
-{
-  "roomId": "c5d6e7f8-1234-5678-9abc-def123456789",
-  "playerId": "f9e8d7c6-5432-1098-7654-321098765432",
-  "seatIdx": 3
-}
-```
-
-**获取房间信息**
-
-| 名称   | 请求方法 | 路径                    | 说明     |
-| ---- | ---- | --------------------- | ------ |
-| 房间信息 | GET  | `/api/rooms/{roomId}` | 获取房间详情 |
-
-请求参数：无（路径参数 `roomId`）
-
-响应体（200 OK）：
-
-```json
-{
-  "roomId": "c5d6e7f8-1234-5678-9abc-def123456789",
-  "roomCode": "A3B9C1",
-  "hostId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "hostName": "merlin",
-  "maxPlayers": 7,
-  "players": [
-    { "playerId": "xxx", "nickname": "merlin", "seatIdx": 0, "isReady": true },
-    { "playerId": "yyy", "nickname": "morgana", "seatIdx": 1, "isReady": false }
-  ],
-  "status": "WAITING",
-  "createdAt": "2025-11-17T12:34:56Z"
-}
-```
-
-### 7.3 游戏资源API
-
-| 名称       | 请求方法 | 路径                                                   | 说明           |
-| -------- | ---- | ---------------------------------------------------- | ------------ |
-| 房主开始游戏   | POST | `/api/games/{gameId}/start`                          | 房主开始一局游戏     |
-| 队长提议出征成员 | POST | `/api/games/{gameId}/quests/{questNumber}/proposals` | 当前队长提交本轮出征名单 |
-| 玩家投票     | POST | `/api/games/{gameId}/proposals/{proposalId}/votes`   | 全体玩家对提案投票    |
-| 查看投票情况   | GET  | `/api/games/{gameId}/proposals/{proposalId}/votes`   | 查询当前提案投票汇总   |
-| 出征者提交任务  | POST | `/api/games/{gameId}/quests/{questNumber}/execution` | 出征成员匿名提交任务结果 |
-| 查看任务结果   | GET  | `/api/games/{gameId}/quests/{questNumber}/result`    | 获取本轮任务最终成败   |
-| 刺客查看可选目标 | GET  | `/api/games/{gameId}/assassination/targets`          | 刺客查看可刺杀玩家列表  |
-| 刺客执行刺杀   | POST | `/api/games/{gameId}/assassination`                  | 刺客选择目标完成刺杀   |
-| 查看角色信息   | GET  | `/api/games/{gameId}/role-info`                      | 玩家查看自己的角色信息  |
-
-请求/响应概览：
-
-| 名称       | 最小角色 | 请求体                                    | 响应体                      |
-| -------- | ---- | -------------------------------------- | ------------------------ |
-| 房主开始游戏   | 房主   | `{}`                                   | `GameStartedDTO`         |
-| 队长提议出征成员 | 当前队长 | `ProposedTeamDTO {members: UUID[]}`    | `TeamProposedDTO`        |
-| 玩家投票     | 全体玩家 | `VoteDTO {approve: boolean}`           | `VoteReceivedDTO`        |
-| 查看投票情况   | 全体玩家 | —                                      | `VoteSummaryDTO`         |
-| 出征者提交任务  | 出征成员 | `QuestExecutionDTO {success: boolean}` | `QuestExecutedDTO`       |
-| 查看任务结果   | 全体玩家 | —                                      | `QuestResultDTO`         |
-| 刺客查看可选目标 | 刺客   | —                                      | `List<PlayerDTO>`        |
-| 刺客执行刺杀   | 刺客   | `AssassinationDTO {targetId: UUID}`    | `AssassinationResultDTO` |
-| 查看角色信息   | 全体玩家 | —                                      | `RoleInfoResponse`       |
-
-权限校验规则（Spring Security 伪代码）：
-
-```java
-@PreAuthorize("isHost(#gameId)")          // 仅房主
-@PreAuthorize("isCurrentLeader(#gameId)") // 仅当前队长
-@PreAuthorize("isQuestMember(#gameId)")   // 仅本轮出征者
-@PreAuthorize("hasRole(#gameId, 'ASSASSIN')") // 仅刺客
-@PreAuthorize("isPlayer(#gameId)")      // 任意局内玩家
-```
