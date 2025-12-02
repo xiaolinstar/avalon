@@ -641,10 +641,86 @@
   2. 响应体中 `message` 提示玩家不在游戏中。
 - **后置清理**: 无。
 
-#### **GAME-ROLE-INFO-TC-003: 使用无效游戏ID获取角色信息**
-- **测试目的**: 验证使用无效游戏ID无法获取角色信息。
+#### **GAME-START-FIRST-QUEST-TC-001: 成功开始第一个任务**
+- **测试目的**: 验证房主可以在游戏处于ROLE_VIEWING状态时成功开始第一个任务。
+- **前置条件**:
+  1. 用户 `host` 是房间 `TEST08` 的房主，已登录。
+  2. 房间 `TEST08` 中已有 5 名玩家。
+  3. 游戏已开始，房间状态为 `playing`，游戏状态为 `ROLE_VIEWING`。
+- **请求方法/URL**: `POST /api/games/{gameId}/start-first-quest`
+- **请求头**: `Authorization: Bearer <host_token>`
+- **请求参数**: (无)
+- **预期响应**:
+  - `Status Code: 200 OK`
+  - `Body`:
+    ```json
+    {
+      "success": true,
+      "message": "第一个任务开始成功",
+      "data": ""
+    }
+    ```
+- **实际响应验证点**:
+  1. 响应体中 `success` 为 `true`。
+  2. **数据库验证**:
+     - `games` 表中对应游戏的状态变为 `PLAYING`。
+     - `quests` 表中为当前游戏创建了5条任务记录。
+     - 第一个任务的队长为座位号为1的玩家。
+  3. **WebSocket 验证**: `/topic/game/{gameId}` 主题上应广播一条 `FIRST_QUEST_STARTED` 事件消息。
+- **后置清理**: 结束或重置游戏状态。
+
+#### **GAME-START-FIRST-QUEST-TC-002: 游戏状态不正确时开始第一个任务**
+- **测试目的**: 验证当游戏状态不正确时，无法开始第一个任务。
+- **前置条件**:
+  1. 用户 `host` 是房间 `TEST09` 的房主，已登录。
+  2. 房间 `TEST09` 中已有 5 名玩家。
+  3. 游戏已开始，房间状态为 `playing`，游戏状态为 `PLAYING`（不是ROLE_VIEWING）。
+- **请求方法/URL**: `POST /api/games/{gameId}/start-first-quest`
+- **请求头**: `Authorization: Bearer <host_token>`
+- **请求参数**: (无)
+- **预期响应**:
+  - `Status Code: 400 Bad Request`
+  - `Body`:
+    ```json
+    {
+      "success": false,
+      "message": "游戏状态不正确，无法开始第一个任务",
+      "data": null
+    }
+    ```
+- **实际响应验证点**:
+  1. 响应体中 `success` 为 `false`。
+  2. 响应体中 `message` 提示游戏状态不正确。
+- **后置清理**: 无。
+
+#### **GAME-START-FIRST-QUEST-TC-003: 非房主尝试开始第一个任务**
+- **测试目的**: 验证非房主玩家无法开始第一个任务。
+- **前置条件**:
+  1. 用户 `player2` 是房间 `TEST10` 的普通玩家，已登录。
+  2. 房间 `TEST10` 中已有 5 名玩家。
+  3. 游戏已开始，房间状态为 `playing`，游戏状态为 `ROLE_VIEWING`。
+- **请求方法/URL**: `POST /api/games/{gameId}/start-first-quest`
+- **请求头**: `Authorization: Bearer <player2_token>`
+- **请求参数**: (无)
+- **预期响应**:
+  - `Status Code: 400 Bad Request`
+  - `Body`:
+    ```json
+    {
+      "success": false,
+      "message": "只有房主可以开始第一个任务",
+      "data": null
+    }
+    ```
+- **实际响应验证点**:
+  1. 响应体中 `success` 为 `false`。
+  2. 响应体中 `message` 提示只有房主可以开始第一个任务。
+- **后置清理**: 无。
+
+#### **GAME-START-FIRST-QUEST-TC-004: 使用无效游戏ID开始第一个任务**
+- **测试目的**: 验证使用无效游戏ID无法开始第一个任务。
 - **前置条件**: 用户 `testuser` 已登录，获得有效 Token。
-- **请求方法/URL**: `GET /api/games/invalid-game-id/role-info`
+- **请求方法/URL**: `POST /api/games/invalid-game-id/start-first-quest`
 - **请求头**: `Authorization: Bearer <valid_token>`
 - **请求参数**: (无)
 - **预期响应**:
@@ -661,3 +737,59 @@
   1. 响应体中 `success` 为 `false`。
   2. 响应体中 `message` 提示游戏不存在。
 - **后置清理**: 无。
+
+#### **GAME-START-QUEST-TC-001: 使用统一接口成功开始第一个任务**
+- **测试目的**: 验证可以通过统一接口成功开始第一个任务。
+- **前置条件**:
+  1. 用户 `host` 是房间 `TEST11` 的房主，已登录。
+  2. 房间 `TEST11` 中已有 5 名玩家。
+  3. 游戏已开始，房间状态为 `playing`，游戏状态为 `ROLE_VIEWING`。
+- **请求方法/URL**: `POST /api/games/{gameId}/start-quest?isFirstQuest=true`
+- **请求头**: `Authorization: Bearer <host_token>`
+- **请求参数**: `isFirstQuest=true`
+- **预期响应**:
+  - `Status Code: 200 OK`
+  - `Body`:
+    ```json
+    {
+      "success": true,
+      "message": "第一个任务开始成功",
+      "data": ""
+    }
+    ```
+- **实际响应验证点**:
+  1. 响应体中 `success` 为 `true`。
+  2. **数据库验证**:
+     - `games` 表中对应游戏的状态变为 `PLAYING`。
+     - `quests` 表中为当前游戏创建了5条任务记录。
+     - 第一个任务的队长为座位号为1的玩家。
+  3. **WebSocket 验证**: `/topic/game/{gameId}` 主题上应广播一条 `FIRST_QUEST_STARTED` 事件消息。
+- **后置清理**: 结束或重置游戏状态。
+
+#### **GAME-START-QUEST-TC-002: 使用统一接口成功开始后续任务**
+- **测试目的**: 验证可以通过统一接口成功开始后续任务。
+- **前置条件**:
+  1. 用户 `host` 是房间 `TEST12` 的房主，已登录。
+  2. 房间 `TEST12` 中已有 5 名玩家。
+  3. 游戏已开始，房间状态为 `playing`，游戏状态为 `PLAYING`。
+  4. 当前处于第一轮任务结束后，准备开始第二轮任务。
+- **请求方法/URL**: `POST /api/games/{gameId}/start-quest?isFirstQuest=false`
+- **请求头**: `Authorization: Bearer <host_token>`
+- **请求参数**: `isFirstQuest=false`
+- **预期响应**:
+  - `Status Code: 200 OK`
+  - `Body`:
+    ```json
+    {
+      "success": true,
+      "message": "任务开始成功",
+      "data": ""
+    }
+    ```
+- **实际响应验证点**:
+  1. 响应体中 `success` 为 `true`。
+  2. **数据库验证**:
+     - `games` 表中游戏轮次增加1。
+     - `quests` 表中为当前游戏创建了新的任务记录。
+     - 新任务的队长根据轮询规则正确设置。
+- **后置清理**: 结束或重置游戏状态。

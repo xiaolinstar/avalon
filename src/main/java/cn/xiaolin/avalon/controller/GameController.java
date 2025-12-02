@@ -49,6 +49,21 @@ public class GameController {
         }
     }
 
+    @PostMapping("/{gameId}/start-quest")
+    public ResponseEntity<ApiResponse<String>> startQuest(@PathVariable UUID gameId, 
+            @RequestParam(defaultValue = "false") boolean isFirstQuest) {
+        try {
+            gameService.startQuest(gameId, isFirstQuest);
+            if (isFirstQuest) {
+                return ResponseEntity.ok(ApiResponse.success("第一个任务开始成功", ""));
+            } else {
+                return ResponseEntity.ok(ApiResponse.success("任务开始成功", ""));
+            }
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+        }
+    }
+
     @GetMapping("/{gameId}/players")
     public ResponseEntity<ApiResponse<List<GamePlayer>>> getGamePlayers(@PathVariable UUID gameId) {
         try {

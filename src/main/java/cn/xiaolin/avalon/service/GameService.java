@@ -118,6 +118,7 @@ public class GameService {
 
     /**
      * 开始第一个任务，当所有玩家都查看完角色后调用
+     * 注意：这是为了保持向后兼容性而保留的方法，实际任务启动应使用统一的startQuest方法
      */
     @Transactional
     public void startFirstQuest(UUID gameId) {
@@ -136,23 +137,55 @@ public class GameService {
         // 创建任务
         createQuests(game, playerCount);
 
-        // 设置第一个任务的队长
-        Quest firstQuest = questRepository.findByGameOrderByRoundNumber(game).get(0);
-        firstQuest.setLeader(gamePlayers.get(0).getUser());
-        questRepository.save(firstQuest);
+        // 使用统一方法启动第一个任务
+        startQuest(gameId, true);
+    }
 
-        // 更新游戏状态
-        game.setStatus(GameStatus.PLAYING.getValue());
-        gameRepository.save(game);
+    /**
+     * 统一的任务启动方法
+     * @param gameId 游戏ID
+     * @param isFirstQuest 是否为第一个任务
+     */
+    @Transactional
+    public void startQuest(UUID gameId, boolean isFirstQuest) {
+        Game game = gameRepository.findById(gameId)
+            .orElseThrow(() -> new RuntimeException("游戏不存在"));
 
-        // 发送WebSocket消息通知所有玩家第一个任务已开始
-        GameMessage message = new GameMessage();
-        message.setType("FIRST_QUEST_STARTED");
-        message.setGameId(gameId);
-        message.setContent("第一个任务已开始");
-        message.setTimestamp(System.currentTimeMillis());
-        
-        messagingTemplate.convertAndSend("/topic/game/" + gameId, message);
+        // 对于第一个任务，需要特殊处理
+        if (isFirstQuest) {
+            // 确保游戏处于正确的状态
+            if (!game.getStatus().equals(GameStatus.ROLE_VIEWING.getValue())) {
+                throw new RuntimeException("游戏状态不正确，无法开始第一个任务");
+            }
+            
+            // 获取玩家数量
+            List<GamePlayer> gamePlayers = gamePlayerRepository.findByGame(game);
+            int playerCount = gamePlayers.size();
+            
+            // 创建任务
+            createQuests(game, playerCount);
+            
+            // 更新游戏状态
+            game.setStatus(GameStatus.PLAYING.getValue());
+            gameRepository.save(game);
+            
+            // 设置第一个任务的队长
+            Quest firstQuest = questRepository.findByGameOrderByRoundNumber(game).get(0);
+            firstQuest.setLeader(gamePlayers.get(0).getUser());
+            questRepository.save(firstQuest);
+            
+            // 发送WebSocket消息通知所有玩家第一个任务已开始
+            GameMessage message = new GameMessage();
+            message.setType("FIRST_QUEST_STARTED");
+            message.setGameId(gameId);
+            message.setContent("第一个任务已开始");
+            message.setTimestamp(System.currentTimeMillis());
+            
+            messagingTemplate.convertAndSend("/topic/game/" + gameId, message);
+        } else {
+            // 后续任务的处理逻辑
+            startNextRound(game);
+        }
     }
 
     private void assignRoles(Game game, List<User> players) {

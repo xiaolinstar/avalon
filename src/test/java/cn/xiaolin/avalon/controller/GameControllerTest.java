@@ -4,11 +4,7 @@ import cn.xiaolin.avalon.dto.ApiResponse;
 import cn.xiaolin.avalon.dto.CreateRoomRequest;
 import cn.xiaolin.avalon.dto.RoomResponse;
 import cn.xiaolin.avalon.entity.User;
-import cn.xiaolin.avalon.repository.GamePlayerRepository;
-import cn.xiaolin.avalon.repository.GameRepository;
-import cn.xiaolin.avalon.repository.RoomPlayerRepository;
-import cn.xiaolin.avalon.repository.RoomRepository;
-import cn.xiaolin.avalon.repository.UserRepository;
+import cn.xiaolin.avalon.repository.*;
 import cn.xiaolin.avalon.utils.JwtUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.type.TypeFactory;
@@ -60,6 +56,15 @@ class GameControllerTest {
 
     @Autowired
     private GamePlayerRepository gamePlayerRepository;
+
+    @Autowired
+    private QuestRepository questRepository;
+
+    @Autowired
+    private VoteRepository voteRepository;
+
+    @Autowired
+    private QuestResultRepository questResultRepository;
 
     @Autowired
     private JwtUtil jwtUtil;
@@ -122,6 +127,9 @@ class GameControllerTest {
     @AfterEach
     void tearDown() {
         // 按正确顺序清理测试数据
+        voteRepository.deleteAll();
+        questResultRepository.deleteAll();
+        questRepository.deleteAll();
         gamePlayerRepository.deleteAll();
         gameRepository.deleteAll();
         roomPlayerRepository.deleteAll();
@@ -209,6 +217,94 @@ class GameControllerTest {
         mockMvc.perform(get("/api/rooms/{roomCode}", roomCode))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("playing"));
+    }
+    
+    /**
+     * GAME-START-QUEST-TC-001: 使用统一接口成功开始第一个任务
+     * 测试目的: 验证可以通过统一接口成功开始第一个任务。
+     */
+    @Test
+    void whenStartingQuestWithValidGameAsFirstQuest_thenReturnsSuccess() throws Exception {
+        // 首先开始游戏
+        mockMvc.perform(post("/api/games/{roomId}/start", roomId)
+                        .header("Authorization", authorizationHeader))
+                .andExpect(status().isOk());
+
+        // 验证游戏现在处于role_viewing状态
+        mockMvc.perform(get("/api/rooms/{roomCode}", roomCode))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("playing"));
+                
+        // 获取实际的游戏ID
+        String roomResponseStr = mockMvc.perform(get("/api/rooms/{roomCode}", roomCode))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        // 解析响应以获取游戏ID
+        ApiResponse<RoomResponse> roomApiResponse = objectMapper.readValue(roomResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomResponse.class));
+        RoomResponse roomResponse = roomApiResponse.getData();
+        String gameId = roomResponse.getGameId().toString();
+        
+        // When & Then - 使用统一接口开始第一个任务
+        mockMvc.perform(post("/api/games/{gameId}/start-quest?isFirstQuest=true", gameId)
+                        .header("Authorization", authorizationHeader))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("第一个任务开始成功"));
+
+        // 验证WebSocket消息已发送
+        verify(messagingTemplate, atLeastOnce())
+                .convertAndSend(anyString(), any(Object.class));
+                
+        // 验证游戏状态已更新为playing
+        mockMvc.perform(get("/api/rooms/{roomCode}", roomCode))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("playing"));
+    }
+    
+    /**
+     * GAME-START-QUEST-TC-002: 使用统一接口成功开始后续任务
+     * 测试目的: 验证可以通过统一接口成功开始后续任务。
+     */
+    @Test
+    void whenStartingQuestWithValidGameAsNextQuest_thenReturnsSuccess() throws Exception {
+        // 首先开始游戏
+        mockMvc.perform(post("/api/games/{roomId}/start", roomId)
+                        .header("Authorization", authorizationHeader))
+                .andExpect(status().isOk());
+
+        // 验证游戏现在处于role_viewing状态
+        mockMvc.perform(get("/api/rooms/{roomCode}", roomCode))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("playing"));
+                
+        // 获取实际的游戏ID
+        String roomResponseStr = mockMvc.perform(get("/api/rooms/{roomCode}", roomCode))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        // 解析响应以获取游戏ID
+        ApiResponse<RoomResponse> roomApiResponse = objectMapper.readValue(roomResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomResponse.class));
+        RoomResponse roomResponse = roomApiResponse.getData();
+        String gameId = roomResponse.getGameId().toString();
+        
+        // 先开始第一个任务
+        mockMvc.perform(post("/api/games/{gameId}/start-first-quest", gameId)
+                        .header("Authorization", authorizationHeader))
+                .andExpect(status().isOk());
+        
+        // When & Then - 使用统一接口开始后续任务
+        mockMvc.perform(post("/api/games/{gameId}/start-quest?isFirstQuest=false", gameId)
+                        .header("Authorization", authorizationHeader))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("任务开始成功"));
     }
     
     /**
