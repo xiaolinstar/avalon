@@ -1,8 +1,6 @@
 package cn.xiaolin.avalon.controller;
 
-import cn.xiaolin.avalon.dto.ApiResponse;
-import cn.xiaolin.avalon.dto.CreateRoomRequest;
-import cn.xiaolin.avalon.dto.RoomResponse;
+import cn.xiaolin.avalon.dto.*;
 import cn.xiaolin.avalon.entity.User;
 import cn.xiaolin.avalon.repository.*;
 import cn.xiaolin.avalon.utils.JwtUtil;
@@ -20,7 +18,9 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -203,7 +203,7 @@ class GameControllerTest {
         String gameId = roomResponse.getGameId().toString();
         
         // When & Then - 开始第一个任务
-        mockMvc.perform(post("/api/games/{gameId}/start-first-quest", gameId)
+        mockMvc.perform(post("/api/games/{gameId}/quest?isFirstQuest=true", gameId)
                         .header("Authorization", authorizationHeader))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -249,7 +249,7 @@ class GameControllerTest {
         String gameId = roomResponse.getGameId().toString();
         
         // When & Then - 使用统一接口开始第一个任务
-        mockMvc.perform(post("/api/games/{gameId}/start-quest?isFirstQuest=true", gameId)
+        mockMvc.perform(post("/api/games/{gameId}/quest?isFirstQuest=true", gameId)
                         .header("Authorization", authorizationHeader))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -295,12 +295,12 @@ class GameControllerTest {
         String gameId = roomResponse.getGameId().toString();
         
         // 先开始第一个任务
-        mockMvc.perform(post("/api/games/{gameId}/start-first-quest", gameId)
+        mockMvc.perform(post("/api/games/{gameId}/quest?isFirstQuest=true", gameId)
                         .header("Authorization", authorizationHeader))
                 .andExpect(status().isOk());
         
         // When & Then - 使用统一接口开始后续任务
-        mockMvc.perform(post("/api/games/{gameId}/start-quest?isFirstQuest=false", gameId)
+        mockMvc.perform(post("/api/games/{gameId}/quest", gameId)
                         .header("Authorization", authorizationHeader))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -402,5 +402,486 @@ class GameControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").value("游戏不存在"));
+    }
+    
+    /**
+     * TEAM-PROPOSAL-TC-001: 队长成功提议队伍
+     * 测试目的: 验证队长可以成功为当前任务提议一个符合要求的队伍。
+     */
+    @Test
+    void whenLeaderProposesValidTeam_thenReturnsSuccess() throws Exception {
+        // 首先开始游戏
+        mockMvc.perform(post("/api/games/{roomId}/start", roomId)
+                        .header("Authorization", authorizationHeader))
+                .andExpect(status().isOk());
+
+        // 验证游戏现在处于role_viewing状态
+        mockMvc.perform(get("/api/rooms/{roomCode}", roomCode))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("playing"));
+                
+        // 获取实际的游戏ID
+        String roomResponseStr = mockMvc.perform(get("/api/rooms/{roomCode}", roomCode))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        // 解析响应以获取游戏ID
+        ApiResponse<RoomResponse> roomApiResponse = objectMapper.readValue(roomResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomResponse.class));
+        RoomResponse roomResponse = roomApiResponse.getData();
+        String gameId = roomResponse.getGameId().toString();
+        
+        // 开始第一个任务
+        mockMvc.perform(post("/api/games/{gameId}/quest?isFirstQuest=true", gameId)
+                        .header("Authorization", authorizationHeader))
+                .andExpect(status().isOk());
+        
+        // 获取房间中的所有玩家ID
+        String playersResponseStr = mockMvc.perform(get("/api/rooms/{roomCode}/players", roomCode))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        
+        // 解析响应以获取玩家信息
+        ApiResponse<RoomPlayersResponse> playersApiResponse = objectMapper.readValue(playersResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomPlayersResponse.class));
+        List<PlayerInfoResponse> players = playersApiResponse.getData().getPlayers();
+        
+        // 构造队伍提议请求，选择前两个玩家
+        List<UUID> selectedPlayerIds = players.stream()
+                .limit(2)
+                .map(PlayerInfoResponse::getPlayerId)
+                .collect(Collectors.toList());
+        
+        ProposeTeamRequest request = new ProposeTeamRequest();
+        request.setPlayerIds(selectedPlayerIds);
+        
+        // When & Then - 队长提议队伍
+        mockMvc.perform(post("/api/games/{gameId}/propose-team", gameId)
+                        .header("Authorization", authorizationHeader)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("队伍提议成功"));
+    }
+    
+    /**
+     * TEAM-PROPOSAL-TC-002: 非队长尝试提议队伍
+     * 测试目的: 验证非队长玩家无法提议队伍。
+     */
+    @Test
+    void whenNonLeaderAttemptsToProposeTeam_thenReturnsError() throws Exception {
+        // 首先开始游戏
+        mockMvc.perform(post("/api/games/{roomId}/start", roomId)
+                        .header("Authorization", authorizationHeader))
+                .andExpect(status().isOk());
+
+        // 验证游戏现在处于role_viewing状态
+        mockMvc.perform(get("/api/rooms/{roomCode}", roomCode))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("playing"));
+                
+        // 获取实际的游戏ID
+        String roomResponseStr = mockMvc.perform(get("/api/rooms/{roomCode}", roomCode))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        // 解析响应以获取游戏ID
+        ApiResponse<RoomResponse> roomApiResponse = objectMapper.readValue(roomResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomResponse.class));
+        RoomResponse roomResponse = roomApiResponse.getData();
+        String gameId = roomResponse.getGameId().toString();
+        
+        // 开始第一个任务
+        mockMvc.perform(post("/api/games/{gameId}/quest?isFirstQuest=true", gameId)
+                        .header("Authorization", authorizationHeader))
+                .andExpect(status().isOk());
+        
+        // 获取房间中的所有玩家ID
+        String playersResponseStr = mockMvc.perform(get("/api/rooms/{roomCode}/players", roomCode))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        
+        // 解析响应以获取玩家信息
+        ApiResponse<RoomPlayersResponse> playersApiResponse = objectMapper.readValue(playersResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomPlayersResponse.class));
+        List<PlayerInfoResponse> players = playersApiResponse.getData().getPlayers();
+        
+        // 找到一个非队长的玩家
+        PlayerInfoResponse nonLeader = players.stream()
+                .filter(p -> !p.getIsHost())
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("未找到非队长玩家"));
+        
+        // 为非队长玩家生成JWT令牌
+        String nonLeaderToken = "Bearer " + jwtUtil.generateToken(nonLeader.getPlayerId(), nonLeader.getUsername());
+        
+        // 构造队伍提议请求
+        List<UUID> selectedPlayerIds = players.stream()
+                .limit(2)
+                .map(PlayerInfoResponse::getPlayerId)
+                .collect(Collectors.toList());
+        
+        ProposeTeamRequest request = new ProposeTeamRequest();
+        request.setPlayerIds(selectedPlayerIds);
+        
+        // When & Then - 非队长提议队伍应该失败
+        mockMvc.perform(post("/api/games/{gameId}/propose-team", gameId)
+                        .header("Authorization", nonLeaderToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value("不是当前队长"));
+    }
+    
+    /**
+     * TEAM-VOTE-TC-001: 玩家成功投票
+     * 测试目的: 验证玩家可以成功对提议的队伍进行投票。
+     */
+    @Test
+    void whenPlayerVotesSuccessfully_thenReturnsSuccess() throws Exception {
+        // 首先开始游戏
+        mockMvc.perform(post("/api/games/{roomId}/start", roomId)
+                        .header("Authorization", authorizationHeader))
+                .andExpect(status().isOk());
+
+        // 验证游戏现在处于role_viewing状态
+        mockMvc.perform(get("/api/rooms/{roomCode}", roomCode))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("playing"));
+                
+        // 获取实际的游戏ID
+        String roomResponseStr = mockMvc.perform(get("/api/rooms/{roomCode}", roomCode))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        // 解析响应以获取游戏ID
+        ApiResponse<RoomResponse> roomApiResponse = objectMapper.readValue(roomResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomResponse.class));
+        RoomResponse roomResponse = roomApiResponse.getData();
+        String gameId = roomResponse.getGameId().toString();
+        
+        // 开始第一个任务
+        mockMvc.perform(post("/api/games/{gameId}/quest?isFirstQuest=true", gameId)
+                        .header("Authorization", authorizationHeader))
+                .andExpect(status().isOk());
+        
+        // 队长提议队伍
+        String playersResponseStr = mockMvc.perform(get("/api/rooms/{roomCode}/players", roomCode))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        
+        // 解析响应以获取玩家信息
+        ApiResponse<RoomPlayersResponse> playersApiResponse = objectMapper.readValue(playersResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomPlayersResponse.class));
+        List<PlayerInfoResponse> players = playersApiResponse.getData().getPlayers();
+        
+        // 构造队伍提议请求，选择前两个玩家
+        List<UUID> selectedPlayerIds = players.stream()
+                .limit(2)
+                .map(PlayerInfoResponse::getPlayerId)
+                .collect(Collectors.toList());
+        
+        ProposeTeamRequest proposeRequest = new ProposeTeamRequest();
+        proposeRequest.setPlayerIds(selectedPlayerIds);
+        
+        // 队长提议队伍
+        mockMvc.perform(post("/api/games/{gameId}/propose-team", gameId)
+                        .header("Authorization", authorizationHeader)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(proposeRequest)))
+                .andExpect(status().isOk());
+        
+        // 获取一个非队长玩家的令牌
+        PlayerInfoResponse nonLeader = players.stream()
+                .filter(p -> !p.getIsHost())
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("未找到非队长玩家"));
+        
+        String voterToken = "Bearer " + jwtUtil.generateToken(nonLeader.getPlayerId(), nonLeader.getUsername());
+        
+        // 构造投票请求
+        VoteRequest voteRequest = new VoteRequest();
+        voteRequest.setVoteType("APPROVE");
+        
+        // When & Then - 玩家投票
+        mockMvc.perform(post("/api/games/{gameId}/vote", gameId)
+                        .header("Authorization", voterToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(voteRequest)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("投票成功"));
+    }
+    
+    /**
+     * TEAM-VOTE-TC-002: 玩家重复投票
+     * 测试目的: 验证玩家无法对同一任务重复投票。
+     */
+    @Test
+    void whenPlayerVotesTwice_thenSecondVoteFails() throws Exception {
+        // 首先开始游戏
+        mockMvc.perform(post("/api/games/{roomId}/start", roomId)
+                        .header("Authorization", authorizationHeader))
+                .andExpect(status().isOk());
+
+        // 验证游戏现在处于role_viewing状态
+        mockMvc.perform(get("/api/rooms/{roomCode}", roomCode))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("playing"));
+                
+        // 获取实际的游戏ID
+        String roomResponseStr = mockMvc.perform(get("/api/rooms/{roomCode}", roomCode))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        // 解析响应以获取游戏ID
+        ApiResponse<RoomResponse> roomApiResponse = objectMapper.readValue(roomResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomResponse.class));
+        RoomResponse roomResponse = roomApiResponse.getData();
+        String gameId = roomResponse.getGameId().toString();
+        
+        // 开始第一个任务
+        mockMvc.perform(post("/api/games/{gameId}/quest?isFirstQuest=true", gameId)
+                        .header("Authorization", authorizationHeader))
+                .andExpect(status().isOk());
+        
+        // 队长提议队伍
+        String playersResponseStr = mockMvc.perform(get("/api/rooms/{roomCode}/players", roomCode))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        
+        // 解析响应以获取玩家信息
+        ApiResponse<RoomPlayersResponse> playersApiResponse = objectMapper.readValue(playersResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomPlayersResponse.class));
+        List<PlayerInfoResponse> players = playersApiResponse.getData().getPlayers();
+        
+        // 构造队伍提议请求，选择前两个玩家
+        List<UUID> selectedPlayerIds = players.stream()
+                .limit(2)
+                .map(PlayerInfoResponse::getPlayerId)
+                .collect(Collectors.toList());
+        
+        ProposeTeamRequest proposeRequest = new ProposeTeamRequest();
+        proposeRequest.setPlayerIds(selectedPlayerIds);
+        
+        // 队长提议队伍
+        mockMvc.perform(post("/api/games/{gameId}/propose-team", gameId)
+                        .header("Authorization", authorizationHeader)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(proposeRequest)))
+                .andExpect(status().isOk());
+        
+        // 获取一个非队长玩家的令牌
+        PlayerInfoResponse nonLeader = players.stream()
+                .filter(p -> !p.getIsHost())
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("未找到非队长玩家"));
+        
+        String voterToken = "Bearer " + jwtUtil.generateToken(nonLeader.getPlayerId(), nonLeader.getUsername());
+        
+        // 构造投票请求
+        VoteRequest voteRequest = new VoteRequest();
+        voteRequest.setVoteType("APPROVE");
+        
+        // 第一次投票
+        mockMvc.perform(post("/api/games/{gameId}/vote", gameId)
+                        .header("Authorization", voterToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(voteRequest)))
+                .andExpect(status().isOk());
+        
+        // 第二次投票应该失败
+        mockMvc.perform(post("/api/games/{gameId}/vote", gameId)
+                        .header("Authorization", voterToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(voteRequest)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value("已经投过票了"));
+    }
+    
+    /**
+     * TEAM-VOTE-TC-003: 投票通过
+     * 测试目的: 验证当足够多的玩家投票同意时，投票通过并进入下一阶段。
+     */
+    @Test
+    void whenMajorityApprovesVote_thenVotePasses() throws Exception {
+        // 首先开始游戏
+        mockMvc.perform(post("/api/games/{roomId}/start", roomId)
+                        .header("Authorization", authorizationHeader))
+                .andExpect(status().isOk());
+
+        // 验证游戏现在处于role_viewing状态
+        mockMvc.perform(get("/api/rooms/{roomCode}", roomCode))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("playing"));
+                
+        // 获取实际的游戏ID
+        String roomResponseStr = mockMvc.perform(get("/api/rooms/{roomCode}", roomCode))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        // 解析响应以获取游戏ID
+        ApiResponse<RoomResponse> roomApiResponse = objectMapper.readValue(roomResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomResponse.class));
+        RoomResponse roomResponse = roomApiResponse.getData();
+        String gameId = roomResponse.getGameId().toString();
+        
+        // 开始第一个任务
+        mockMvc.perform(post("/api/games/{gameId}/quest?isFirstQuest=true", gameId)
+                        .header("Authorization", authorizationHeader))
+                .andExpect(status().isOk());
+        
+        // 队长提议队伍
+        String playersResponseStr = mockMvc.perform(get("/api/rooms/{roomCode}/players", roomCode))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        
+        // 解析响应以获取玩家信息
+        ApiResponse<RoomPlayersResponse> playersApiResponse = objectMapper.readValue(playersResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomPlayersResponse.class));
+        List<PlayerInfoResponse> players = playersApiResponse.getData().getPlayers();
+        
+        // 构造队伍提议请求，选择前两个玩家
+        List<UUID> selectedPlayerIds = players.stream()
+                .limit(2)
+                .map(PlayerInfoResponse::getPlayerId)
+                .collect(Collectors.toList());
+        
+        ProposeTeamRequest proposeRequest = new ProposeTeamRequest();
+        proposeRequest.setPlayerIds(selectedPlayerIds);
+        
+        // 队长提议队伍
+        mockMvc.perform(post("/api/games/{gameId}/propose-team", gameId)
+                        .header("Authorization", authorizationHeader)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(proposeRequest)))
+                .andExpect(status().isOk());
+        
+        // 所有玩家投票同意
+        for (PlayerInfoResponse player : players) {
+            String voterToken = "Bearer " + jwtUtil.generateToken(player.getPlayerId(), player.getUsername());
+            
+            VoteRequest voteRequest = new VoteRequest();
+            voteRequest.setVoteType("APPROVE");
+            
+            mockMvc.perform(post("/api/games/{gameId}/vote", gameId)
+                            .header("Authorization", voterToken)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(voteRequest)))
+                    .andExpect(status().isOk());
+        }
+        
+        // 验证WebSocket消息已发送
+        verify(messagingTemplate, atLeastOnce())
+                .convertAndSend(anyString(), any(Object.class));
+    }
+    
+    /**
+     * TEAM-VOTE-TC-004: 投票未通过
+     * 测试目的: 验证当多数玩家投票反对时，投票未通过并重新提议队伍。
+     */
+    @Test
+    void whenMajorityRejectsVote_thenVoteFails() throws Exception {
+        // 首先开始游戏
+        mockMvc.perform(post("/api/games/{roomId}/start", roomId)
+                        .header("Authorization", authorizationHeader))
+                .andExpect(status().isOk());
+
+        // 验证游戏现在处于role_viewing状态
+        mockMvc.perform(get("/api/rooms/{roomCode}", roomCode))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("playing"));
+                
+        // 获取实际的游戏ID
+        String roomResponseStr = mockMvc.perform(get("/api/rooms/{roomCode}", roomCode))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        // 解析响应以获取游戏ID
+        ApiResponse<RoomResponse> roomApiResponse = objectMapper.readValue(roomResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomResponse.class));
+        RoomResponse roomResponse = roomApiResponse.getData();
+        String gameId = roomResponse.getGameId().toString();
+        
+        // 开始第一个任务
+        mockMvc.perform(post("/api/games/{gameId}/quest?isFirstQuest=true", gameId)
+                        .header("Authorization", authorizationHeader))
+                .andExpect(status().isOk());
+        
+        // 队长提议队伍
+        String playersResponseStr = mockMvc.perform(get("/api/rooms/{roomCode}/players", roomCode))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        
+        // 解析响应以获取玩家信息
+        ApiResponse<RoomPlayersResponse> playersApiResponse = objectMapper.readValue(playersResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomPlayersResponse.class));
+        List<PlayerInfoResponse> players = playersApiResponse.getData().getPlayers();
+        
+        // 构造队伍提议请求，选择前两个玩家
+        List<UUID> selectedPlayerIds = players.stream()
+                .limit(2)
+                .map(PlayerInfoResponse::getPlayerId)
+                .collect(Collectors.toList());
+        
+        ProposeTeamRequest proposeRequest = new ProposeTeamRequest();
+        proposeRequest.setPlayerIds(selectedPlayerIds);
+        
+        // 队长提议队伍
+        mockMvc.perform(post("/api/games/{gameId}/propose-team", gameId)
+                        .header("Authorization", authorizationHeader)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(proposeRequest)))
+                .andExpect(status().isOk());
+        
+        // 大部分玩家投票反对
+        int rejectCount = players.size() / 2 + 1; // 超过一半的玩家
+        int i = 0;
+        for (PlayerInfoResponse player : players) {
+            if (i >= rejectCount) break;
+            
+            String voterToken = "Bearer " + jwtUtil.generateToken(player.getPlayerId(), player.getUsername());
+            
+            VoteRequest voteRequest = new VoteRequest();
+            voteRequest.setVoteType("REJECT");
+            
+            mockMvc.perform(post("/api/games/{gameId}/vote", gameId)
+                            .header("Authorization", voterToken)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(voteRequest)))
+                    .andExpect(status().isOk());
+            i++;
+        }
+        
+        // 验证WebSocket消息已发送
+        verify(messagingTemplate, atLeastOnce())
+                .convertAndSend(anyString(), any(Object.class));
     }
 }

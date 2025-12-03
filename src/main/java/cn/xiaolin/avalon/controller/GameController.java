@@ -39,7 +39,12 @@ public class GameController {
         }
     }
 
-    @PostMapping("/{gameId}/start-first-quest")
+    /**
+     * 开始第一个任务的接口（为了向后兼容保留）
+     * @param gameId 游戏ID
+     * @return 启动结果
+     */
+    @PostMapping("/{gameId}/first-quest")
     public ResponseEntity<ApiResponse<String>> startFirstQuest(@PathVariable UUID gameId) {
         try {
             gameService.startFirstQuest(gameId);
@@ -49,7 +54,13 @@ public class GameController {
         }
     }
 
-    @PostMapping("/{gameId}/start-quest")
+    /**
+     * 统一的任务启动接口
+     * @param gameId 游戏ID
+     * @param isFirstQuest 是否为第一个任务
+     * @return 启动结果
+     */
+    @PostMapping("/{gameId}/quest")
     public ResponseEntity<ApiResponse<String>> startQuest(@PathVariable UUID gameId, 
             @RequestParam(defaultValue = "false") boolean isFirstQuest) {
         try {

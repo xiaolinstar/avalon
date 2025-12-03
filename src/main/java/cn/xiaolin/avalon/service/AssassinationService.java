@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -25,12 +26,12 @@ public class AssassinationService {
             .orElseThrow(() -> new RuntimeException("游戏不存在"));
         
         // 验证游戏状态
-        if (!game.getStatus().equals(GameStatus.ENDED.getValue())) {
+        if (!Objects.equals(game.getStatus(), GameStatus.ENDED.getValue())) {
             throw new RuntimeException("游戏还未结束");
         }
         
         // 验证获胜阵营
-        if (!"good".equals(game.getWinner())) {
+        if (!Objects.equals("good", game.getWinner())) {
             throw new RuntimeException("正义阵营未获胜，无法进行刺杀");
         }
         
@@ -38,7 +39,7 @@ public class AssassinationService {
         GamePlayer assassin = gamePlayerRepository.findByGameAndUser(game, userRepository.findById(assassinId).orElseThrow())
             .orElseThrow(() -> new RuntimeException("刺客不在游戏中"));
         
-        if (!assassin.getRole().equals("assassin")) {
+        if (!Objects.equals(assassin.getRole(), "assassin")) {
             throw new RuntimeException("只有刺客可以进行刺杀");
         }
         
@@ -47,7 +48,7 @@ public class AssassinationService {
             .orElseThrow(() -> new RuntimeException("目标玩家不存在"));
         
         // 验证目标是否是梅林
-        boolean isTargetMerlin = target.getRole().equals("merlin");
+        boolean isTargetMerlin = Objects.equals(target.getRole(), "merlin");
         
         // 更新游戏结果
         if (isTargetMerlin) {
@@ -74,8 +75,8 @@ public class AssassinationService {
         Game game = gameRepository.findById(gameId)
             .orElseThrow(() -> new RuntimeException("游戏不存在"));
         
-        return game.getStatus().equals(GameStatus.ENDED.getValue()) && 
-               "good".equals(game.getWinner());
+        return Objects.equals(game.getStatus(), GameStatus.ENDED.getValue()) && 
+               Objects.equals("good", game.getWinner());
     }
 
     public List<GamePlayer> getAssassinationCandidates(UUID gameId) {
@@ -84,7 +85,7 @@ public class AssassinationService {
         
         // 返回所有正义阵营的玩家作为刺杀候选
         return gamePlayerRepository.findByGame(game).stream()
-            .filter(p -> p.getAlignment().equals("good"))
+            .filter(p -> Objects.equals(p.getAlignment(), "good"))
             .collect(java.util.stream.Collectors.toList());
     }
 }

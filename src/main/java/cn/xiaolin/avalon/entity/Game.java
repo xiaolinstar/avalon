@@ -1,5 +1,6 @@
 package cn.xiaolin.avalon.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -9,11 +10,16 @@ import org.hibernate.annotations.CreationTimestamp;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+/**
+ * 游戏实体类
+ * 代表阿瓦隆游戏的一个实例，包含游戏的状态和相关信息
+ */
 @Entity
 @Table(name = "games")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Game {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -21,6 +27,7 @@ public class Game {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "room_id", nullable = false)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "players", "game"})
     private Room room;
 
     @Column(nullable = false, length = 20)

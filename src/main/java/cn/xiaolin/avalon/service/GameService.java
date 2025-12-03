@@ -1,33 +1,37 @@
 package cn.xiaolin.avalon.service;
 
+import cn.xiaolin.avalon.dto.*;
 import cn.xiaolin.avalon.entity.*;
 import cn.xiaolin.avalon.enums.*;
 import cn.xiaolin.avalon.repository.*;
 import cn.xiaolin.avalon.websocket.GameMessage;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
-import java.time.LocalDateTime;
-import cn.xiaolin.avalon.dto.ProposeTeamRequest;
-import cn.xiaolin.avalon.dto.VoteRequest;
-import cn.xiaolin.avalon.dto.ExecuteQuestRequest;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
 public class GameService {
     private final GameRepository gameRepository;
     private final GamePlayerRepository gamePlayerRepository;
-    private final QuestRepository questRepository;
     private final RoomRepository roomRepository;
     private final RoomPlayerRepository roomPlayerRepository;
-    private final UserRepository userRepository;
+    private final QuestRepository questRepository;
     private final VoteRepository voteRepository;
     private final QuestResultRepository questResultRepository;
+    private final UserRepository userRepository;
     private final SimpMessagingTemplate messagingTemplate;
+    
+    @PersistenceContext
+    private EntityManager entityManager;
 
     // 角色配置
     private static final Map<Integer, List<String>> ROLE_CONFIGS = Map.of(
@@ -126,7 +130,7 @@ public class GameService {
             .orElseThrow(() -> new RuntimeException("游戏不存在"));
 
         // 确保游戏处于正确的状态
-        if (!game.getStatus().equals(GameStatus.ROLE_VIEWING.getValue())) {
+        if (!Objects.equals(game.getStatus(), GameStatus.ROLE_VIEWING.getValue())) {
             throw new RuntimeException("游戏状态不正确，无法开始第一个任务");
         }
 
@@ -153,8 +157,8 @@ public class GameService {
 
         // 对于第一个任务，需要特殊处理
         if (isFirstQuest) {
-            // 确保游戏处于正确的状态
-            if (!game.getStatus().equals(GameStatus.ROLE_VIEWING.getValue())) {
+            // 确保游戏处于正确的状态（ROLE_VIEWING表示所有玩家已加入并准备开始游戏）
+            if (!Objects.equals(game.getStatus(), GameStatus.ROLE_VIEWING.getValue())) {
                 throw new RuntimeException("游戏状态不正确，无法开始第一个任务");
             }
             
@@ -162,17 +166,24 @@ public class GameService {
             List<GamePlayer> gamePlayers = gamePlayerRepository.findByGame(game);
             int playerCount = gamePlayers.size();
             
-            // 创建任务
+            // 为游戏创建所有任务
             createQuests(game, playerCount);
             
-            // 更新游戏状态
+            // 更新游戏状态为PLAYING，表示游戏正式开始
             game.setStatus(GameStatus.PLAYING.getValue());
             gameRepository.save(game);
             
-            // 设置第一个任务的队长
+            // 获取第一个任务
             Quest firstQuest = questRepository.findByGameOrderByRoundNumber(game).get(0);
-            firstQuest.setLeader(gamePlayers.get(0).getUser());
-            questRepository.save(firstQuest);
+            if (firstQuest == null) {
+                throw new RuntimeException("没有找到第一个任务");
+            }
+            
+            // 确保第一个任务的队长已设置
+            if (Objects.isNull(firstQuest.getLeader()) && !gamePlayers.isEmpty()) {
+                firstQuest.setLeader(gamePlayers.get(0).getUser());
+                questRepository.save(firstQuest);
+            }
             
             // 发送WebSocket消息通知所有玩家第一个任务已开始
             GameMessage message = new GameMessage();
@@ -205,8 +216,16 @@ public class GameService {
         gamePlayerRepository.saveAll(gamePlayerList);
     }
 
+    /**
+     * 为游戏创建所有任务
+     * @param game 游戏对象
+     * @param playerCount 玩家数量
+     */
     private void createQuests(Game game, int playerCount) {
         List<int[]> questConfig = QUEST_CONFIGS.get(playerCount);
+        
+        // 获取游戏中的所有玩家，用于设置第一个任务的队长
+        List<GamePlayer> gamePlayers = gamePlayerRepository.findByGame(game);
         
         for (int i = 0; i < questConfig.size(); i++) {
             Quest quest = new Quest();
@@ -216,13 +235,17 @@ public class GameService {
             quest.setRequiredFails(questConfig.get(i)[1]);
             quest.setStatus(QuestStatus.PROPOSING.getValue());
             
+            // 如果是第一个任务，设置队长
+            if (i == 0 && !gamePlayers.isEmpty()) {
+                quest.setLeader(gamePlayers.get(0).getUser());
+            }
+            
             questRepository.save(quest);
         }
     }
 
     private String getAlignment(String role) {
         return switch (role) {
-            case "merlin", "percival", "loyal_servant" -> Alignment.GOOD.getValue();
             case "morgana", "assassin", "minion", "oberon" -> Alignment.EVIL.getValue();
             default -> Alignment.GOOD.getValue();
         };
@@ -258,32 +281,57 @@ public class GameService {
     public Quest proposeTeam(UUID gameId, UUID leaderId, ProposeTeamRequest request) {
         Game game = gameRepository.findById(gameId)
             .orElseThrow(() -> new RuntimeException("游戏不存在"));
-        
-        User leader = userRepository.findById(leaderId)
-            .orElseThrow(() -> new RuntimeException("玩家不存在"));
-        
+    
         Quest currentQuest = getCurrentQuest(game);
         if (currentQuest == null) {
             throw new RuntimeException("没有当前任务");
         }
-        
-        if (!currentQuest.getLeader().getId().equals(leaderId)) {
+    
+        // 检查队长是否为空
+        if (Objects.isNull(currentQuest.getLeader())) {
+            // 尝试重新加载任务以获取队长信息
+            currentQuest = questRepository.findById(currentQuest.getId())
+                    .orElse(currentQuest);
+            if (Objects.isNull(currentQuest.getLeader())) {
+                throw new RuntimeException("当前任务队长未设置");
+            }
+        }
+    
+        // 验证请求者是否为当前任务的队长
+        if (!Objects.equals(currentQuest.getLeader().getId(), leaderId)) {
             throw new RuntimeException("不是当前队长");
         }
-        
-        if (!currentQuest.getStatus().equals(QuestStatus.PROPOSING.getValue())) {
+    
+        // 验证任务状态是否为队伍组建阶段
+        if (!Objects.equals(currentQuest.getStatus(), QuestStatus.PROPOSING.getValue())) {
             throw new RuntimeException("当前阶段不是队伍组建");
         }
-        
-        // 验证队伍成员
+    
+        // 验证队伍成员数量是否符合要求
         if (request.getPlayerIds().size() != currentQuest.getRequiredPlayers()) {
             throw new RuntimeException("队伍人数不符合要求");
         }
-        
+    
+        // 设置提议的队伍成员
+        List<User> proposedMembers = userRepository.findAllById(request.getPlayerIds());
+        currentQuest.setProposedMembers(proposedMembers);
+    
         // 更新任务状态为投票阶段
         currentQuest.setStatus(QuestStatus.VOTING.getValue());
         questRepository.save(currentQuest);
-        
+    
+        // 刷新实体管理器以确保数据同步
+        entityManager.flush();
+    
+        // 发送WebSocket消息通知所有玩家开始投票
+        GameMessage message = new GameMessage();
+        message.setType("TEAM_PROPOSED");
+        message.setGameId(gameId);
+        message.setContent("队伍已提议，请投票");
+        message.setTimestamp(System.currentTimeMillis());
+    
+        messagingTemplate.convertAndSend("/topic/game/" + gameId, message);
+    
         return currentQuest;
     }
 
@@ -291,30 +339,44 @@ public class GameService {
     public Vote submitVote(UUID gameId, UUID playerId, VoteRequest request) {
         Game game = gameRepository.findById(gameId)
             .orElseThrow(() -> new RuntimeException("游戏不存在"));
-        
+    
         GamePlayer player = gamePlayerRepository.findByGameAndUser(game, userRepository.findById(playerId).orElseThrow())
             .orElseThrow(() -> new RuntimeException("玩家不在游戏中"));
         
-        Quest currentQuest = getCurrentQuest(game);
-        if (currentQuest == null) {
+        // 获取当前进行中的任务（排除已完成或失败的任务）
+        List<Quest> quests = questRepository.findByGameOrderByRoundNumber(game);
+        Quest currentQuest = quests.stream()
+            .filter(q -> !Objects.equals(q.getStatus(), QuestStatus.COMPLETED.getValue()) && 
+                       !Objects.equals(q.getStatus(), QuestStatus.FAILED.getValue()))
+            .findFirst()
+            .orElse(null);
+        
+        if (Objects.isNull(currentQuest)) {
             throw new RuntimeException("没有当前任务");
         }
-        
-        if (!currentQuest.getStatus().equals(QuestStatus.VOTING.getValue())) {
-            throw new RuntimeException("当前阶段不是投票");
+    
+        // 通过ID重新查询任务以确保获取最新状态
+        currentQuest = questRepository.findById(currentQuest.getId())
+            .orElseThrow(() -> new RuntimeException("任务不存在"));
+    
+        // 验证任务状态是否为投票阶段
+        if (!Objects.equals(currentQuest.getStatus(),QuestStatus.VOTING.getValue())) {
+            // 添加更详细的错误信息
+            throw new RuntimeException("当前阶段不是投票，当前状态为: " + currentQuest.getStatus());
         }
-        
-        // 检查是否已经投票
-        if (voteRepository.existsByQuestAndPlayer(currentQuest, player.getUser())) {
+    
+        // 检查玩家是否已经对该任务投过票
+        boolean hasVoted = voteRepository.existsByQuestAndPlayer(currentQuest, player.getUser());
+        if (hasVoted) {
             throw new RuntimeException("已经投过票了");
         }
-        
+    
         // 创建投票记录
         Vote vote = new Vote();
         vote.setQuest(currentQuest);
         vote.setPlayer(player.getUser());
         vote.setVoteType(request.getVoteType());
-        
+    
         return voteRepository.save(vote);
     }
 
@@ -328,14 +390,16 @@ public class GameService {
             throw new RuntimeException("没有当前任务");
         }
         
+        // 统计投票结果
         List<Vote> votes = voteRepository.findByQuest(currentQuest);
         long approveCount = votes.stream()
-            .filter(v -> v.getVoteType().equals(VoteType.APPROVE.getValue()))
+            .filter(v -> Objects.equals(v.getVoteType(), VoteType.APPROVE.getValue()))
             .count();
         long rejectCount = votes.stream()
-            .filter(v -> v.getVoteType().equals(VoteType.REJECT.getValue()))
+            .filter(v -> Objects.equals(v.getVoteType(), VoteType.REJECT.getValue()))
             .count();
         
+        // 判断投票是否通过（赞成票数大于反对票数）
         boolean votePassed = approveCount > rejectCount;
         
         if (votePassed) {
@@ -349,6 +413,20 @@ public class GameService {
         }
         
         questRepository.save(currentQuest);
+        
+        // 发送WebSocket消息通知投票结果
+        GameMessage message = new GameMessage();
+        if (votePassed) {
+            message.setType("TEAM_APPROVED");
+            message.setContent("队伍提议已通过，进入任务执行阶段");
+        } else {
+            message.setType("TEAM_REJECTED");
+            message.setContent("队伍提议被否决，需要重新提议队伍");
+        }
+        message.setGameId(gameId);
+        message.setTimestamp(System.currentTimeMillis());
+        
+        messagingTemplate.convertAndSend("/topic/game/" + gameId, message);
     }
 
     @Transactional
@@ -364,7 +442,8 @@ public class GameService {
             throw new RuntimeException("没有当前任务");
         }
         
-        if (!currentQuest.getStatus().equals(QuestStatus.EXECUTING.getValue())) {
+        // 验证任务状态是否为执行阶段
+        if (!Objects.equals(currentQuest.getStatus(), QuestStatus.EXECUTING.getValue())) {
             throw new RuntimeException("当前阶段不是任务执行");
         }
         
@@ -405,7 +484,7 @@ public class GameService {
             } else {
                 // 检查是否已经有3个任务失败
                 long failedQuests = questRepository.findByGameOrderByRoundNumber(game).stream()
-                    .filter(q -> q.getStatus().equals(QuestStatus.FAILED.getValue()))
+                    .filter(q -> Objects.equals(q.getStatus(), QuestStatus.FAILED.getValue()))
                     .count();
                 
                 if (failedQuests >= 3) {
@@ -419,22 +498,29 @@ public class GameService {
         }
     }
 
+    /**
+     * 获取当前进行中的任务
+     * @param game 游戏对象
+     * @return 当前任务，如果没有找到则返回null
+     */
     private Quest getCurrentQuest(Game game) {
         return questRepository.findByGameOrderByRoundNumber(game).stream()
-            .filter(q -> !q.getStatus().equals(QuestStatus.COMPLETED.getValue()) && 
-                       !q.getStatus().equals(QuestStatus.FAILED.getValue()))
+            .filter(q -> !Objects.equals(q.getStatus(), QuestStatus.COMPLETED.getValue()) && 
+                       !Objects.equals(q.getStatus(), QuestStatus.FAILED.getValue()))
             .findFirst()
             .orElse(null);
     }
 
     private void changeLeader(Game game, Quest quest) {
         List<GamePlayer> players = gamePlayerRepository.findByGame(game);
+        // 找到当前队长在玩家列表中的索引位置
         int currentLeaderIndex = players.stream()
-            .filter(p -> p.getUser().getId().equals(quest.getLeader().getId()))
+            .filter(p -> Objects.equals(p.getUser().getId(), quest.getLeader().getId()))
             .findFirst()
             .map(p -> p.getSeatNumber() - 1)
             .orElse(0);
         
+        // 计算下一个队长的索引位置（循环选择）
         int nextLeaderIndex = (currentLeaderIndex + 1) % players.size();
         GamePlayer nextLeader = players.stream()
             .filter(p -> p.getSeatNumber() == nextLeaderIndex + 1)
@@ -459,28 +545,36 @@ public class GameService {
     }
 
     private void startNextRound(Game game) {
+        // 增加游戏轮次
         game.setCurrentRound(game.getCurrentRound() + 1);
+        gameRepository.save(game);
         
-        // 创建新的任务
-        Quest newQuest = new Quest();
-        newQuest.setGame(game);
-        newQuest.setRoundNumber(game.getCurrentRound());
+        // 获取对应轮次的任务（所有任务在游戏开始时已预先创建）
+        List<Quest> quests = questRepository.findByGameOrderByRoundNumber(game);
+        Quest nextQuest = quests.stream()
+            .filter(q -> Objects.equals(q.getRoundNumber(), game.getCurrentRound()))
+            .findFirst()
+            .orElseThrow(() -> new RuntimeException("没有找到第" + game.getCurrentRound() + "轮任务"));
         
-        // 根据玩家数量和当前轮次设置任务参数
-        int playerCount = gamePlayerRepository.findByGame(game).size();
-        int[] questConfig = QUEST_CONFIGS.get(playerCount).get(game.getCurrentRound() - 1);
-        newQuest.setRequiredPlayers(questConfig[0]);
-        newQuest.setRequiredFails(questConfig[1]);
-        newQuest.setStatus(QuestStatus.PROPOSING.getValue());
+        // 更新任务状态为队伍组建阶段
+        nextQuest.setStatus(QuestStatus.PROPOSING.getValue());
         
-        // 设置新的队长
+        // 设置新的队长（按座位号顺序循环选择）
         List<GamePlayer> players = gamePlayerRepository.findByGame(game);
         int currentLeaderIndex = (game.getCurrentRound() - 1) % players.size();
         GamePlayer newLeader = players.get(currentLeaderIndex);
-        newQuest.setLeader(newLeader.getUser());
+        nextQuest.setLeader(newLeader.getUser());
         
-        questRepository.save(newQuest);
-        gameRepository.save(game);
+        questRepository.save(nextQuest);
+        
+        // 发送WebSocket消息通知所有玩家下一轮已开始
+        GameMessage message = new GameMessage();
+        message.setType("NEXT_ROUND_STARTED");
+        message.setGameId(game.getId());
+        message.setContent("第" + game.getCurrentRound() + "轮任务已开始");
+        message.setTimestamp(System.currentTimeMillis());
+        
+        messagingTemplate.convertAndSend("/topic/game/" + game.getId(), message);
     }
 
     private void endGame(Game game, String winner, String winType) {

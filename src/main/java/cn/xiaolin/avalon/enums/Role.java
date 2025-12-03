@@ -2,6 +2,8 @@ package cn.xiaolin.avalon.enums;
 
 import lombok.Getter;
 
+import java.util.Objects;
+
 @Getter
 public enum Role {
     // 正义阵营
@@ -29,10 +31,10 @@ public enum Role {
     }
 
     public boolean isGood() {
-        return "正义".equals(alignment);
+        return Objects.equals("正义", alignment);
     }
 
     public boolean isEvil() {
-        return "邪恶".equals(alignment);
+        return Objects.equals("邪恶", alignment);
     }
 }

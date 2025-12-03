@@ -793,3 +793,222 @@
      - `quests` 表中为当前游戏创建了新的任务记录。
      - 新任务的队长根据轮询规则正确设置。
 - **后置清理**: 结束或重置游戏状态。
+
+---
+  
+### **5. 队伍提议和投票测试 (Team Proposal and Voting Module)**
+
+#### **TEAM-PROPOSAL-TC-001: 队长成功提议队伍**
+- **测试目的**: 验证队长可以成功为当前任务提议一个符合要求的队伍。
+- **前置条件**:
+  1. 用户 `leader` 是房间 `TEST13` 的房主，已登录。
+  2. 房间 `TEST13` 中已有 5 名玩家。
+  3. 游戏已开始，房间状态为 `playing`，游戏状态为 `PLAYING`。
+  4. 当前处于第一轮任务的队伍组建阶段。
+  5. 第一轮任务需要2名玩家参与。
+- **请求方法/URL**: `POST /api/games/{gameId}/propose-team`
+- **请求头**: `Authorization: Bearer <leader_token>`
+- **请求参数**:
+  ```json
+  {
+    "playerIds": ["uuid1", "uuid2"]
+  }
+  ```
+- **预期响应**:
+  - `Status Code: 200 OK`
+  - `Body`:
+    ```json
+    {
+      "success": true,
+      "message": "队伍提议成功",
+      "data": {
+        // Quest对象信息
+      }
+    }
+    ```
+- **实际响应验证点**:
+  1. 响应体中 `success` 为 `true`。
+  2. **数据库验证**:
+     - `quests` 表中当前任务的 `status` 变为 `VOTING`。
+     - `quests` 表中当前任务的 `proposedMembers` 包含指定的玩家。
+  3. **WebSocket 验证**: `/topic/game/{gameId}` 主题上应广播一条 `TEAM_PROPOSED` 事件消息。
+- **后置清理**: 结束或重置游戏状态。
+
+#### **TEAM-PROPOSAL-TC-002: 非队长尝试提议队伍**
+- **测试目的**: 验证非队长玩家无法提议队伍。
+- **前置条件**:
+  1. 用户 `player2` 是房间 `TEST14` 的普通玩家，已登录。
+  2. 房间 `TEST14` 中已有 5 名玩家。
+  3. 游戏已开始，房间状态为 `playing`，游戏状态为 `PLAYING`。
+  4. 当前处于第一轮任务的队伍组建阶段。
+  5. 用户 `player3` 是当前队长。
+- **请求方法/URL**: `POST /api/games/{gameId}/propose-team`
+- **请求头**: `Authorization: Bearer <player2_token>`
+- **请求参数**:
+  ```json
+  {
+    "playerIds": ["uuid1", "uuid2"]
+  }
+  ```
+- **预期响应**:
+  - `Status Code: 400 Bad Request`
+  - `Body`:
+    ```json
+    {
+      "success": false,
+      "message": "不是当前队长",
+      "data": null
+    }
+    ```
+- **实际响应验证点**:
+  1. 响应体中 `success` 为 `false`。
+  2. 响应体中 `message` 提示不是当前队长。
+- **后置清理**: 无。
+
+#### **TEAM-PROPOSAL-TC-003: 队伍成员数量不符合要求**
+- **测试目的**: 验证当提议的队伍成员数量不符合当前任务要求时，系统会拒绝提议。
+- **前置条件**:
+  1. 用户 `leader` 是房间 `TEST15` 的房主，已登录。
+  2. 房间 `TEST15` 中已有 5 名玩家。
+  3. 游戏已开始，房间状态为 `playing`，游戏状态为 `PLAYING`。
+  4. 当前处于第一轮任务的队伍组建阶段。
+  5. 第一轮任务需要2名玩家参与。
+- **请求方法/URL**: `POST /api/games/{gameId}/propose-team`
+- **请求头**: `Authorization: Bearer <leader_token>`
+- **请求参数**:
+  ```json
+  {
+    "playerIds": ["uuid1", "uuid2", "uuid3"] // 3人队伍，但任务只需要2人
+  }
+  ```
+- **预期响应**:
+  - `Status Code: 400 Bad Request`
+  - `Body`:
+    ```json
+    {
+      "success": false,
+      "message": "队伍人数不符合要求",
+      "data": null
+    }
+    ```
+- **实际响应验证点**:
+  1. 响应体中 `success` 为 `false`。
+  2. 响应体中 `message` 提示队伍人数不符合要求。
+- **后置清理**: 无。
+
+#### **TEAM-VOTE-TC-001: 玩家成功投票**
+- **测试目的**: 验证玩家可以成功对提议的队伍进行投票。
+- **前置条件**:
+  1. 用户 `player1` 是房间 `TEST16` 的玩家，已登录。
+  2. 房间 `TEST16` 中已有 5 名玩家。
+  3. 游戏已开始，房间状态为 `playing`，游戏状态为 `PLAYING`。
+  4. 当前处于第一轮任务的投票阶段。
+- **请求方法/URL**: `POST /api/games/{gameId}/vote`
+- **请求头**: `Authorization: Bearer <player1_token>`
+- **请求参数**:
+  ```json
+  {
+    "voteType": "APPROVE" // 或 "REJECT"
+  }
+  ```
+- **预期响应**:
+  - `Status Code: 200 OK`
+  - `Body`:
+    ```json
+    {
+      "success": true,
+      "message": "投票成功",
+      "data": {
+        // Vote对象信息
+      }
+    }
+    ```
+- **实际响应验证点**:
+  1. 响应体中 `success` 为 `true`。
+  2. **数据库验证**:
+     - `votes` 表中增加一条投票记录。
+- **后置清理**: 无。
+
+#### **TEAM-VOTE-TC-002: 玩家重复投票**
+- **测试目的**: 验证玩家无法对同一任务重复投票。
+- **前置条件**:
+  1. 用户 `player1` 是房间 `TEST17` 的玩家，已登录。
+  2. 房间 `TEST17` 中已有 5 名玩家。
+  3. 游戏已开始，房间状态为 `playing`，游戏状态为 `PLAYING`。
+  4. 当前处于第一轮任务的投票阶段。
+  5. 用户 `player1` 已经投过票。
+- **请求方法/URL**: `POST /api/games/{gameId}/vote`
+- **请求头**: `Authorization: Bearer <player1_token>`
+- **请求参数**:
+  ```json
+  {
+    "voteType": "APPROVE"
+  }
+  ```
+- **预期响应**:
+  - `Status Code: 400 Bad Request`
+  - `Body`:
+    ```json
+    {
+      "success": false,
+      "message": "已经投过票了",
+      "data": null
+    }
+    ```
+- **实际响应验证点**:
+  1. 响应体中 `success` 为 `false`。
+  2. 响应体中 `message` 提示已经投过票了。
+- **后置清理**: 无。
+
+#### **TEAM-VOTE-TC-003: 投票通过**
+- **测试目的**: 验证当投票通过时，系统正确更新任务状态。
+- **前置条件**:
+  1. 房间 `TEST18` 中已有 5 名玩家。
+  2. 游戏已开始，房间状态为 `playing`，游戏状态为 `PLAYING`。
+  3. 当前处于第一轮任务的投票阶段。
+  4. 3名玩家投赞成票，2名玩家投反对票。
+- **请求方法/URL**: `POST /api/games/{gameId}/process-votes`
+- **请求参数**: 无
+- **预期响应**:
+  - `Status Code: 200 OK`
+  - `Body`:
+    ```json
+    {
+      "success": true,
+      "message": "投票结果处理成功",
+      "data": null
+    }
+    ```
+- **实际响应验证点**:
+  1. 响应体中 `success` 为 `true`。
+  2. **数据库验证**:
+     - `quests` 表中当前任务的 `status` 变为 `EXECUTING`。
+  3. **WebSocket 验证**: `/topic/game/{gameId}` 主题上应广播一条 `TEAM_APPROVED` 事件消息。
+- **后置清理**: 结束或重置游戏状态。
+
+#### **TEAM-VOTE-TC-004: 投票未通过**
+- **测试目的**: 验证当投票未通过时，系统正确更新任务状态并更换队长。
+- **前置条件**:
+  1. 房间 `TEST19` 中已有 5 名玩家。
+  2. 游戏已开始，房间状态为 `playing`，游戏状态为 `PLAYING`。
+  3. 当前处于第一轮任务的投票阶段。
+  4. 2名玩家投赞成票，3名玩家投反对票。
+- **请求方法/URL**: `POST /api/games/{gameId}/process-votes`
+- **请求参数**: 无
+- **预期响应**:
+  - `Status Code: 200 OK`
+  - `Body`:
+    ```json
+    {
+      "success": true,
+      "message": "投票结果处理成功",
+      "data": null
+    }
+    ```
+- **实际响应验证点**:
+  1. 响应体中 `success` 为 `true`。
+  2. **数据库验证**:
+     - `quests` 表中当前任务的 `status` 变为 `PROPOSING`。
+     - `quests` 表中当前任务的 `leader` 更换为下一位玩家。
+  3. **WebSocket 验证**: `/topic/game/{gameId}` 主题上应广播一条 `TEAM_REJECTED` 事件消息。
+- **后置清理**: 结束或重置游戏状态。
