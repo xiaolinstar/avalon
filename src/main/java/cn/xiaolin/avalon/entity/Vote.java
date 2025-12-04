@@ -25,10 +25,17 @@ public class Vote {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    // 与Quest关联（向后兼容）
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "quest_id", nullable = false)
+    @JoinColumn(name = "quest_id")
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "game", "votes", "results", "proposedMembers"})
     private Quest quest;
+
+    // 与Proposal关联（新设计）
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "proposal_id")
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "votes"})
+    private Proposal proposal;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "player_id", nullable = false)

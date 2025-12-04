@@ -647,7 +647,7 @@
   1. 用户 `host` 是房间 `TEST08` 的房主，已登录。
   2. 房间 `TEST08` 中已有 5 名玩家。
   3. 游戏已开始，房间状态为 `playing`，游戏状态为 `ROLE_VIEWING`。
-- **请求方法/URL**: `POST /api/games/{gameId}/start-first-quest`
+- **请求方法/URL**: `POST /api/games/{gameId}/quest?isFirstQuest=true`
 - **请求头**: `Authorization: Bearer <host_token>`
 - **请求参数**: (无)
 - **预期响应**:
@@ -675,7 +675,7 @@
   1. 用户 `host` 是房间 `TEST09` 的房主，已登录。
   2. 房间 `TEST09` 中已有 5 名玩家。
   3. 游戏已开始，房间状态为 `playing`，游戏状态为 `PLAYING`（不是ROLE_VIEWING）。
-- **请求方法/URL**: `POST /api/games/{gameId}/start-first-quest`
+- **请求方法/URL**: `POST /api/games/{gameId}/quest?isFirstQuest=true`
 - **请求头**: `Authorization: Bearer <host_token>`
 - **请求参数**: (无)
 - **预期响应**:
@@ -699,7 +699,7 @@
   1. 用户 `player2` 是房间 `TEST10` 的普通玩家，已登录。
   2. 房间 `TEST10` 中已有 5 名玩家。
   3. 游戏已开始，房间状态为 `playing`，游戏状态为 `ROLE_VIEWING`。
-- **请求方法/URL**: `POST /api/games/{gameId}/start-first-quest`
+- **请求方法/URL**: `POST /api/games/{gameId}/quest?isFirstQuest=true`
 - **请求头**: `Authorization: Bearer <player2_token>`
 - **请求参数**: (无)
 - **预期响应**:
@@ -720,7 +720,7 @@
 #### **GAME-START-FIRST-QUEST-TC-004: 使用无效游戏ID开始第一个任务**
 - **测试目的**: 验证使用无效游戏ID无法开始第一个任务。
 - **前置条件**: 用户 `testuser` 已登录，获得有效 Token。
-- **请求方法/URL**: `POST /api/games/invalid-game-id/start-first-quest`
+- **请求方法/URL**: `POST /api/games/invalid-game-id/quest?isFirstQuest=true`
 - **请求头**: `Authorization: Bearer <valid_token>`
 - **请求参数**: (无)
 - **预期响应**:
@@ -744,7 +744,7 @@
   1. 用户 `host` 是房间 `TEST11` 的房主，已登录。
   2. 房间 `TEST11` 中已有 5 名玩家。
   3. 游戏已开始，房间状态为 `playing`，游戏状态为 `ROLE_VIEWING`。
-- **请求方法/URL**: `POST /api/games/{gameId}/start-quest?isFirstQuest=true`
+- **请求方法/URL**: `POST /api/games/{gameId}/quest?isFirstQuest=true`
 - **请求头**: `Authorization: Bearer <host_token>`
 - **请求参数**: `isFirstQuest=true`
 - **预期响应**:
@@ -773,7 +773,7 @@
   2. 房间 `TEST12` 中已有 5 名玩家。
   3. 游戏已开始，房间状态为 `playing`，游戏状态为 `PLAYING`。
   4. 当前处于第一轮任务结束后，准备开始第二轮任务。
-- **请求方法/URL**: `POST /api/games/{gameId}/start-quest?isFirstQuest=false`
+- **请求方法/URL**: `POST /api/games/{gameId}/quest?isFirstQuest=false`
 - **请求头**: `Authorization: Bearer <host_token>`
 - **请求参数**: `isFirstQuest=false`
 - **预期响应**:
@@ -792,6 +792,109 @@
      - `games` 表中游戏轮次增加1。
      - `quests` 表中为当前游戏创建了新的任务记录。
      - 新任务的队长根据轮询规则正确设置。
+- **后置清理**: 结束或重置游戏状态。
+
+#### **QUEST-FULL-FLOW-TC-001: 完整的第一轮任务流程使正义阵营获胜**
+- **测试目的**: 验证从开始第一个任务到任务执行成功，再到正义阵营获胜的完整流程。
+- **前置条件**:
+  1. 房间 `TEST21` 中已有 5 名玩家。
+  2. 游戏已开始，房间状态为 `playing`，游戏状态为 `ROLE_VIEWING`。
+  3. 所有玩家均已查看角色信息。
+- **测试步骤**:
+  1. **开始第一个任务**
+     - **请求方法/URL**: `POST /api/games/{gameId}/quest?isFirstQuest=true`
+     - **请求头**: `Authorization: Bearer <host_token>`
+     - **预期响应**:
+       - `Status Code: 200 OK`
+       - `Body`:
+         ```json
+         {
+           "success": true,
+           "message": "第一个任务开始成功",
+           "data": ""
+         }
+         ```
+  2. **队长提议队伍**
+     - **请求方法/URL**: `POST /api/games/{gameId}/propose-team`
+     - **请求头**: `Authorization: Bearer <leader_token>`
+     - **请求参数**:
+       ```json
+       {
+         "playerIds": ["uuid1", "uuid2"] // 两个正义阵营玩家的ID
+       }
+       ```
+     - **预期响应**:
+       - `Status Code: 200 OK`
+       - `Body`:
+         ```json
+         {
+           "success": true,
+           "message": "队伍提议成功",
+           "data": {
+             // Quest对象信息
+           }
+         }
+         ```
+  3. **所有玩家投票**
+     - **请求方法/URL**: `POST /api/games/{gameId}/vote`
+     - **请求头**: `Authorization: Bearer <player_token>`
+     - **请求参数**:
+       ```json
+       {
+         "voteType": "APPROVE"
+       }
+       ```
+     - **说明**: 所有5名玩家都投赞成票
+  4. **处理投票结果**
+     - 当最后一名玩家提交投票后，服务端处理投票结果
+     - 服务端通过WebSocket向所有玩家广播 `TEAM_APPROVED` 事件消息
+     - 客户端接收到WebSocket消息后，主动查询投票结果
+     - **请求方法/URL**: `GET /api/games/{gameId}/votes?round=1`
+     - **预期响应**:
+       - `Status Code: 200 OK`
+       - `Body`:
+         ```json
+         {
+           "success": true,
+           "message": "投票结果获取成功",
+           "data": {
+             "round": 1,
+             "proposal": {
+               // 提议的队伍信息
+             },
+             "votes": [
+               {
+                 "playerId": "uuid1",
+                 "voteType": "APPROVE"
+               }
+             ],
+             "result": "APPROVED" // 或 "REJECTED"
+           }
+         }
+         ```
+  5. **任务执行**
+     - 如果投票通过，队伍成员开始执行任务
+     - **请求方法/URL**: `POST /api/games/{gameId}/execute-quest`
+     - **请求头**: `Authorization: Bearer <player_token>` (参与任务的玩家)
+     - **请求参数**:
+       ```json
+       {
+         "success": true
+       }
+       ```
+     - **说明**: 两名参与任务的玩家都提交成功的结果
+- **预期最终结果**:
+  1. **数据库验证**:
+     - `quests` 表中第一轮任务的 `status` 变为 `COMPLETED`。
+     - `games` 表中游戏的 `status` 变为 `ENDED`。
+     - `games` 表中游戏的 `winner` 为 `good`。
+  2. **WebSocket 验证**: `/topic/game/{gameId}` 主题上应依次广播以下事件消息：
+     - `FIRST_QUEST_STARTED`
+     - `TEAM_PROPOSED`
+     - `TEAM_APPROVED`
+     - `QUEST_COMPLETED` (宣布正义阵营获胜)
+  3. **流程说明**:
+     - 如果投票未通过，系统将进入下一轮队长的队伍提议阶段
 - **后置清理**: 结束或重置游戏状态。
 
 ---
@@ -967,7 +1070,12 @@
   2. 游戏已开始，房间状态为 `playing`，游戏状态为 `PLAYING`。
   3. 当前处于第一轮任务的投票阶段。
   4. 3名玩家投赞成票，2名玩家投反对票。
-- **请求方法/URL**: `POST /api/games/{gameId}/process-votes`
+- **测试步骤**:
+  1. 最后一名玩家提交投票
+  2. 服务端处理投票结果
+  3. 服务端通过WebSocket向所有玩家广播 `TEAM_APPROVED` 事件消息
+  4. 客户端接收到WebSocket消息后，主动查询投票结果
+- **请求方法/URL**: `GET /api/games/{gameId}/votes?round=1`
 - **请求参数**: 无
 - **预期响应**:
   - `Status Code: 200 OK`
@@ -975,8 +1083,20 @@
     ```json
     {
       "success": true,
-      "message": "投票结果处理成功",
-      "data": null
+      "message": "投票结果获取成功",
+      "data": {
+        "round": 1,
+        "proposal": {
+          // 提议的队伍信息
+        },
+        "votes": [
+          {
+            "playerId": "uuid1",
+            "voteType": "APPROVE"
+          }
+        ],
+        "result": "APPROVED" // 或 "REJECTED"
+      }
     }
     ```
 - **实际响应验证点**:
@@ -993,7 +1113,12 @@
   2. 游戏已开始，房间状态为 `playing`，游戏状态为 `PLAYING`。
   3. 当前处于第一轮任务的投票阶段。
   4. 2名玩家投赞成票，3名玩家投反对票。
-- **请求方法/URL**: `POST /api/games/{gameId}/process-votes`
+- **测试步骤**:
+  1. 最后一名玩家提交投票
+  2. 服务端处理投票结果
+  3. 服务端通过WebSocket向所有玩家广播 `TEAM_REJECTED` 事件消息
+  4. 客户端接收到WebSocket消息后，主动查询投票结果
+- **请求方法/URL**: `GET /api/games/{gameId}/votes?round=1`
 - **请求参数**: 无
 - **预期响应**:
   - `Status Code: 200 OK`
@@ -1001,8 +1126,20 @@
     ```json
     {
       "success": true,
-      "message": "投票结果处理成功",
-      "data": null
+      "message": "投票结果获取成功",
+      "data": {
+        "round": 1,
+        "proposal": {
+          // 提议的队伍信息
+        },
+        "votes": [
+          {
+            "playerId": "uuid1",
+            "voteType": "REJECT"
+          }
+        ],
+        "result": "REJECTED" // 或 "APPROVED"
+      }
     }
     ```
 - **实际响应验证点**:
@@ -1011,4 +1148,150 @@
      - `quests` 表中当前任务的 `status` 变为 `PROPOSING`。
      - `quests` 表中当前任务的 `leader` 更换为下一位玩家。
   3. **WebSocket 验证**: `/topic/game/{gameId}` 主题上应广播一条 `TEAM_REJECTED` 事件消息。
+- **后置清理**: 结束或重置游戏状态。
+
+---
+
+### **6. 完整流程测试 (Full Flow Test)**
+
+#### **FULL-FLOW-TC-001: 完整的第一轮任务流程使正义阵营获胜**
+- **测试目的**: 验证从开始第一个任务到任务执行成功，再到正义阵营获胜的完整流程。
+- **前置条件**:
+  1. 房间 `TEST21` 中已有 5 名玩家。
+  2. 游戏已开始，房间状态为 `playing`，游戏状态为 `ROLE_VIEWING`。
+  3. 所有玩家均已查看角色信息。
+- **测试步骤**:
+  1. **开始第一个任务**
+     - **请求方法/URL**: `POST /api/games/{gameId}/quest?isFirstQuest=true`
+     - **请求头**: `Authorization: Bearer <host_token>`
+     - **预期响应**:
+       - `Status Code: 200 OK`
+       - `Body`:
+         ```json
+         {
+           "success": true,
+           "message": "第一个任务开始成功",
+           "data": ""
+         }
+         ```
+  2. **队长提议队伍**
+     - **请求方法/URL**: `POST /api/games/{gameId}/propose-team`
+     - **请求头**: `Authorization: Bearer <leader_token>`
+     - **请求参数**:
+       ```json
+       {
+         "playerIds": ["uuid1", "uuid2"] // 两个正义阵营玩家的ID
+       }
+       ```
+     - **预期响应**:
+       - `Status Code: 200 OK`
+       - `Body`:
+         ```json
+         {
+           "success": true,
+           "message": "队伍提议成功",
+           "data": {
+             // Quest对象信息
+           }
+         }
+         ```
+  3. **所有玩家投票**
+     - **请求方法/URL**: `POST /api/games/{gameId}/vote`
+     - **请求头**: `Authorization: Bearer <player_token>`
+     - **请求参数**:
+       ```json
+       {
+         "voteType": "APPROVE"
+       }
+       ```
+     - **说明**: 所有5名玩家都投赞成票
+  4. **处理投票结果**
+     - 当最后一名玩家提交投票后，服务端处理投票结果
+     - 服务端通过WebSocket向所有玩家广播 `TEAM_APPROVED` 事件消息
+     - 客户端接收到WebSocket消息后，主动查询投票结果
+     - **请求方法/URL**: `GET /api/games/{gameId}/votes?round=1`
+     - **预期响应**:
+       - `Status Code: 200 OK`
+       - `Body`:
+         ```json
+         {
+           "success": true,
+           "message": "投票结果获取成功",
+           "data": {
+             "round": 1,
+             "proposal": {
+               // 提议的队伍信息
+             },
+             "votes": [
+               {
+                 "playerId": "uuid1",
+                 "voteType": "APPROVE"
+               }
+             ],
+             "result": "APPROVED" // 或 "REJECTED"
+           }
+         }
+         ```
+  5. **任务执行**
+     - 如果投票通过，队伍成员开始执行任务
+     - **请求方法/URL**: `POST /api/games/{gameId}/execute-quest`
+     - **请求头**: `Authorization: Bearer <player_token>` (参与任务的玩家)
+     - **请求参数**:
+       ```json
+       {
+         "success": true
+       }
+       ```
+     - **说明**: 两名参与任务的玩家都提交成功的结果
+- **预期最终结果**:
+  1. **数据库验证**:
+     - `quests` 表中第一轮任务的 `status` 变为 `COMPLETED`。
+     - `games` 表中游戏的 `status` 变为 `ENDED`。
+     - `games` 表中游戏的 `winner` 为 `good`。
+  2. **WebSocket 验证**: `/topic/game/{gameId}` 主题上应依次广播以下事件消息：
+     - `FIRST_QUEST_STARTED`
+     - `TEAM_PROPOSED`
+     - `TEAM_APPROVED`
+     - `QUEST_COMPLETED` (宣布正义阵营获胜)
+  3. **流程说明**:
+     - 如果投票未通过，系统将进入下一轮队长的队伍提议阶段
+- **后置清理**: 结束或重置游戏状态。
+
+---
+
+### **6. 任务执行测试 (Quest Execution Module)**
+
+#### **QUEST-EXECUTION-TC-001: 成功执行任务使正义阵营获胜**
+- **测试目的**: 验证当正义阵营成功执行任务时，游戏正确结束并宣布正义阵营获胜。
+- **前置条件**:
+  1. 房间 `TEST20` 中已有 5 名玩家。
+  2. 游戏已开始，房间状态为 `playing`，游戏状态为 `PLAYING`。
+  3. 当前处于第一轮任务的执行阶段。
+  4. 第一轮任务需要2名玩家参与，只需要1张失败牌即可失败。
+  5. 所有参与任务的玩家均为正义阵营成员。
+- **请求方法/URL**: `POST /api/games/{gameId}/execute-quest`
+- **请求头**: `Authorization: Bearer <player_token>`
+- **请求参数**:
+  ```json
+  {
+    "success": true
+  }
+  ```
+- **预期响应**:
+  - `Status Code: 200 OK`
+  - `Body`:
+    ```json
+    {
+      "success": true,
+      "message": "任务执行成功",
+      "data": null
+    }
+    ```
+- **实际响应验证点**:
+  1. 响应体中 `success` 为 `true`。
+  2. **数据库验证**:
+     - `quests` 表中当前任务的 `status` 变为 `COMPLETED`。
+     - `games` 表中游戏的 `status` 变为 `ENDED`。
+     - `games` 表中游戏的 `winner` 为 `good`。
+  3. **WebSocket 验证**: `/topic/game/{gameId}` 主题上应广播一条 `QUEST_COMPLETED` 事件消息，宣布正义阵营获胜。
 - **后置清理**: 结束或重置游戏状态。

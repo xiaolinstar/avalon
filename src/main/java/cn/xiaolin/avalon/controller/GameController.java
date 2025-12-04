@@ -40,29 +40,15 @@ public class GameController {
     }
 
     /**
-     * 开始第一个任务的接口（为了向后兼容保留）
+     * 开始任务接口
      * @param gameId 游戏ID
+     * @param isFirstQuest 是否为第一个任务（可选参数）
      * @return 启动结果
      */
-    @PostMapping("/{gameId}/first-quest")
-    public ResponseEntity<ApiResponse<String>> startFirstQuest(@PathVariable UUID gameId) {
-        try {
-            gameService.startFirstQuest(gameId);
-            return ResponseEntity.ok(ApiResponse.success("第一个任务开始成功", ""));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
-        }
-    }
-
-    /**
-     * 统一的任务启动接口
-     * @param gameId 游戏ID
-     * @param isFirstQuest 是否为第一个任务
-     * @return 启动结果
-     */
-    @PostMapping("/{gameId}/quest")
-    public ResponseEntity<ApiResponse<String>> startQuest(@PathVariable UUID gameId, 
-            @RequestParam(defaultValue = "false") boolean isFirstQuest) {
+    @PostMapping("/{gameId}/quests")
+    public ResponseEntity<ApiResponse<String>> startQuest(
+            @PathVariable UUID gameId,
+            @RequestParam(required = false, defaultValue = "false") boolean isFirstQuest) {
         try {
             gameService.startQuest(gameId, isFirstQuest);
             if (isFirstQuest) {
@@ -173,20 +159,18 @@ public class GameController {
         }
     }
 
-    @PostMapping("/{gameId}/process-votes")
-    public ResponseEntity<ApiResponse<String>> processVotes(
-            @PathVariable UUID gameId) {
-        try {
-            gameService.processVoteResults(gameId);
-            return ResponseEntity.ok(ApiResponse.success("投票结果处理成功"));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
-        }
-    }
-
-    @PostMapping("/{gameId}/execute-quest")
+    /**
+     * 执行任务接口
+     * @param gameId 游戏ID
+     * @param round 回合数
+     * @param authorizationHeader 授权头
+     * @param request 请求体
+     * @return 执行结果
+     */
+    @PostMapping("/{gameId}/quests/execute")
     public ResponseEntity<ApiResponse<String>> executeQuest(
             @PathVariable UUID gameId,
+            @RequestParam Integer round,
             @RequestHeader("Authorization") String authorizationHeader,
             @Valid @RequestBody ExecuteQuestRequest request) {
         try {

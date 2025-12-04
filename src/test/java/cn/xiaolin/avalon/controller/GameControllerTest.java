@@ -203,8 +203,7 @@ class GameControllerTest {
         String gameId = roomResponse.getGameId().toString();
         
         // When & Then - 开始第一个任务
-        mockMvc.perform(post("/api/games/{gameId}/quest?isFirstQuest=true", gameId)
-                        .header("Authorization", authorizationHeader))
+        mockMvc.perform(post("/api/games/{gameId}/quests?isFirstQuest=true", gameId)                        .header("Authorization", authorizationHeader))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").value("第一个任务开始成功"));
@@ -249,8 +248,7 @@ class GameControllerTest {
         String gameId = roomResponse.getGameId().toString();
         
         // When & Then - 使用统一接口开始第一个任务
-        mockMvc.perform(post("/api/games/{gameId}/quest?isFirstQuest=true", gameId)
-                        .header("Authorization", authorizationHeader))
+        mockMvc.perform(post("/api/games/{gameId}/quests?isFirstQuest=true", gameId)                        .header("Authorization", authorizationHeader))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").value("第一个任务开始成功"));
@@ -295,12 +293,12 @@ class GameControllerTest {
         String gameId = roomResponse.getGameId().toString();
         
         // 先开始第一个任务
-        mockMvc.perform(post("/api/games/{gameId}/quest?isFirstQuest=true", gameId)
+        mockMvc.perform(post("/api/games/{gameId}/quests?isFirstQuest=true", gameId)
                         .header("Authorization", authorizationHeader))
                 .andExpect(status().isOk());
         
         // When & Then - 使用统一接口开始后续任务
-        mockMvc.perform(post("/api/games/{gameId}/quest", gameId)
+        mockMvc.perform(post("/api/games/{gameId}/quests", gameId)
                         .header("Authorization", authorizationHeader))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -434,7 +432,7 @@ class GameControllerTest {
         String gameId = roomResponse.getGameId().toString();
         
         // 开始第一个任务
-        mockMvc.perform(post("/api/games/{gameId}/quest?isFirstQuest=true", gameId)
+        mockMvc.perform(post("/api/games/{gameId}/quests?isFirstQuest=true", gameId)
                         .header("Authorization", authorizationHeader))
                 .andExpect(status().isOk());
         
@@ -499,7 +497,7 @@ class GameControllerTest {
         String gameId = roomResponse.getGameId().toString();
         
         // 开始第一个任务
-        mockMvc.perform(post("/api/games/{gameId}/quest?isFirstQuest=true", gameId)
+        mockMvc.perform(post("/api/games/{gameId}/quests?isFirstQuest=true", gameId)
                         .header("Authorization", authorizationHeader))
                 .andExpect(status().isOk());
         
@@ -573,7 +571,7 @@ class GameControllerTest {
         String gameId = roomResponse.getGameId().toString();
         
         // 开始第一个任务
-        mockMvc.perform(post("/api/games/{gameId}/quest?isFirstQuest=true", gameId)
+        mockMvc.perform(post("/api/games/{gameId}/quests?isFirstQuest=true", gameId)
                         .header("Authorization", authorizationHeader))
                 .andExpect(status().isOk());
         
@@ -657,7 +655,7 @@ class GameControllerTest {
         String gameId = roomResponse.getGameId().toString();
         
         // 开始第一个任务
-        mockMvc.perform(post("/api/games/{gameId}/quest?isFirstQuest=true", gameId)
+        mockMvc.perform(post("/api/games/{gameId}/quests?isFirstQuest=true", gameId)
                         .header("Authorization", authorizationHeader))
                 .andExpect(status().isOk());
         
@@ -748,7 +746,7 @@ class GameControllerTest {
         String gameId = roomResponse.getGameId().toString();
         
         // 开始第一个任务
-        mockMvc.perform(post("/api/games/{gameId}/quest?isFirstQuest=true", gameId)
+        mockMvc.perform(post("/api/games/{gameId}/quests?isFirstQuest=true", gameId)
                         .header("Authorization", authorizationHeader))
                 .andExpect(status().isOk());
         
@@ -829,7 +827,7 @@ class GameControllerTest {
         String gameId = roomResponse.getGameId().toString();
         
         // 开始第一个任务
-        mockMvc.perform(post("/api/games/{gameId}/quest?isFirstQuest=true", gameId)
+        mockMvc.perform(post("/api/games/{gameId}/quests?isFirstQuest=true", gameId)
                         .header("Authorization", authorizationHeader))
                 .andExpect(status().isOk());
         

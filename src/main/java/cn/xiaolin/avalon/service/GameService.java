@@ -141,8 +141,30 @@ public class GameService {
         // 创建任务
         createQuests(game, playerCount);
 
-        // 使用统一方法启动第一个任务
-        startQuest(gameId, true);
+        // 更新游戏状态为PLAYING，表示游戏正式开始
+        game.setStatus(GameStatus.PLAYING.getValue());
+        gameRepository.save(game);
+
+        // 获取第一个任务
+        Quest firstQuest = questRepository.findByGameOrderByRoundNumber(game).get(0);
+        if (firstQuest == null) {
+            throw new RuntimeException("没有找到第一个任务");
+        }
+
+        // 确保第一个任务的队长已设置
+        if (Objects.isNull(firstQuest.getLeader()) && !gamePlayers.isEmpty()) {
+            firstQuest.setLeader(gamePlayers.get(0).getUser());
+            questRepository.save(firstQuest);
+        }
+
+        // 发送WebSocket消息通知所有玩家第一个任务已开始
+        GameMessage message = new GameMessage();
+        message.setType("FIRST_QUEST_STARTED");
+        message.setGameId(gameId);
+        message.setContent("第一个任务已开始");
+        message.setTimestamp(System.currentTimeMillis());
+
+        messagingTemplate.convertAndSend("/topic/game/" + gameId, message);
     }
 
     /**
@@ -224,7 +246,7 @@ public class GameService {
     private void createQuests(Game game, int playerCount) {
         List<int[]> questConfig = QUEST_CONFIGS.get(playerCount);
         
-        // 获取游戏中的所有玩家，用于设置第一个任务的队长
+        // 获取游戏中的所有玩家，用于设置任务的队长
         List<GamePlayer> gamePlayers = gamePlayerRepository.findByGame(game);
         
         for (int i = 0; i < questConfig.size(); i++) {
@@ -235,9 +257,10 @@ public class GameService {
             quest.setRequiredFails(questConfig.get(i)[1]);
             quest.setStatus(QuestStatus.PROPOSING.getValue());
             
-            // 如果是第一个任务，设置队长
-            if (i == 0 && !gamePlayers.isEmpty()) {
-                quest.setLeader(gamePlayers.get(0).getUser());
+            // 为每个任务设置队长（按座位号顺序循环选择）
+            if (!gamePlayers.isEmpty()) {
+                int leaderIndex = i % gamePlayers.size();
+                quest.setLeader(gamePlayers.get(leaderIndex).getUser());
             }
             
             questRepository.save(quest);
@@ -551,6 +574,14 @@ public class GameService {
         
         // 获取对应轮次的任务（所有任务在游戏开始时已预先创建）
         List<Quest> quests = questRepository.findByGameOrderByRoundNumber(game);
+        
+        // 添加调试信息
+        System.out.println("游戏当前轮次: " + game.getCurrentRound());
+        System.out.println("找到的任务数量: " + quests.size());
+        for (Quest q : quests) {
+            System.out.println("任务轮次: " + q.getRoundNumber());
+        }
+        
         Quest nextQuest = quests.stream()
             .filter(q -> Objects.equals(q.getRoundNumber(), game.getCurrentRound()))
             .findFirst()

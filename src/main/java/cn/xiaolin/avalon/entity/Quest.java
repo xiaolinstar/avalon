@@ -5,7 +5,6 @@ import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -13,14 +12,13 @@ import java.util.UUID;
 
 /**
  * 任务实体类
- * 代表阿瓦隆游戏中的一个任务，包含任务的相关信息和状态
+ * 代表游戏中的一轮任务，每轮任务可能有多个提议，但只有一个会被执行
  */
+@Entity
+@Table(name = "quests")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
-@Entity
-@Table(name = "quests")
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Quest {
     @Id
@@ -52,7 +50,7 @@ public class Quest {
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "gamePlayers", "createdRooms"})
     private User leader;
 
-    // 提议的队伍成员
+    // 提议的队伍成员（仅用于向后兼容，新逻辑应通过Proposal实体获取）
     @ManyToMany
     @JoinTable(
         name = "quest_proposed_members",
@@ -61,6 +59,11 @@ public class Quest {
     )
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "gamePlayers", "createdRooms", "proposedQuests"})
     private List<User> proposedMembers;
+    
+    // 添加与Proposal的关联
+    @OneToMany(mappedBy = "quest", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "quest"})
+    private List<Proposal> proposals;
 
     @PrePersist
     protected void onCreate() {
