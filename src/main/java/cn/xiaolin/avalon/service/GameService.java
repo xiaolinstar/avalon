@@ -71,8 +71,14 @@ public class GameService {
 
     @Transactional
     public void startGame(UUID roomId) {
+        // 首先通过roomId获取房间
+        Room room = roomRepository.findById(roomId)
+            .orElseThrow(() -> new RuntimeException("房间不存在"));
+        
+        String roomCode = room.getRoomCode();
+        
         // 检查房间是否已经有游戏存在
-        Optional<Game> existingGameOpt = gameRepository.findByRoomId(roomId);
+        Optional<Game> existingGameOpt = gameRepository.findByRoomRoomCode(roomCode);
         
         // 如果已有游戏且游戏正在进行中，则返回错误
         if (existingGameOpt.isPresent()) {
@@ -82,10 +88,6 @@ public class GameService {
             }
         }
         
-        // 获取房间信息
-        Room room = roomRepository.findById(roomId)
-            .orElseThrow(() -> new RuntimeException("房间不存在"));
-
         room.setStatus(RoomStatus.PLAYING.getValue());
         roomRepository.save(room);
 

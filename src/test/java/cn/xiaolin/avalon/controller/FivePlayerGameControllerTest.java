@@ -116,15 +116,15 @@ class FivePlayerGameControllerTest {
                 .getContentAsString();
 
         // 解析响应以获取房间信息
-        ApiResponse<RoomResponse> apiResponse = objectMapper.readValue(responseStr,
-                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomResponse.class));
-        RoomResponse roomResponse = apiResponse.getData();
+        Result<RoomResponse> Result = objectMapper.readValue(responseStr,
+                TypeFactory.defaultInstance().constructParametricType(Result.class, RoomResponse.class));
+        RoomResponse roomResponse = Result.getData();
         roomCode = roomResponse.getRoomCode();
         roomId = roomResponse.getRoomId().toString();
 
         for(int i=1; i<5; i++) {
-            mockMvc.perform(post("/api/rooms/{roomCode}/join", roomCode)
-                            .header("Authorization", playerTokens.get(i)))
+            mockMvc.perform(post("/api/rooms/{roomCode}", roomCode)
+                        .header("Authorization", playerTokens.get(i)))
                     .andExpect(status().isOk());
         }
     }
@@ -162,9 +162,9 @@ class FivePlayerGameControllerTest {
                 .getContentAsString();
 
         // 解析响应以获取游戏ID
-        ApiResponse<RoomResponse> roomApiResponse = objectMapper.readValue(roomResponseStr,
-                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomResponse.class));
-        RoomResponse roomResponse = roomApiResponse.getData();
+        Result<RoomResponse> roomResult = objectMapper.readValue(roomResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(Result.class, RoomResponse.class));
+        RoomResponse roomResponse = roomResult.getData();
         String gameId = roomResponse.getGameId().toString();
 
         // 开始第一个任务
@@ -181,9 +181,9 @@ class FivePlayerGameControllerTest {
                 .getContentAsString();
 
         // 解析响应以获取玩家信息
-        ApiResponse<RoomPlayersResponse> playersApiResponse = objectMapper.readValue(playersResponseStr,
-                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomPlayersResponse.class));
-        List<PlayerInfoResponse> players = playersApiResponse.getData().getPlayers();
+        Result<RoomPlayersResponse> playersResult = objectMapper.readValue(playersResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(Result.class, RoomPlayersResponse.class));
+        List<PlayerInfoResponse> players = playersResult.getData().getPlayers();
 
         // 执行所有5个任务，确保正义阵营获胜
         for (int round = 1; round <= 5; round++) {
@@ -196,10 +196,10 @@ class FivePlayerGameControllerTest {
                     .getContentAsString();
 
             // 解析响应以获取任务信息
-            ApiResponse<List<Map<String, Object>>> gameApiResponse = objectMapper.readValue(gameResponseStr,
-                    TypeFactory.defaultInstance().constructParametricType(ApiResponse.class,
+            Result<List<Map<String, Object>>> gameResult = objectMapper.readValue(gameResponseStr,
+                    TypeFactory.defaultInstance().constructParametricType(Result.class,
                             TypeFactory.defaultInstance().constructCollectionType(List.class, Map.class)));
-            List<Map<String, Object>> quests = gameApiResponse.getData();
+            List<Map<String, Object>> quests = gameResult.getData();
 
             // 获取当前任务（第一个未完成的任务）
             Map<String, Object> currentQuest = quests.stream()
@@ -274,7 +274,7 @@ class FivePlayerGameControllerTest {
                 Thread.sleep(200);
                 
                 // 验证游戏状态已更新为ENDED，胜利者为good阵营
-                mockMvc.perform(get("/api/games/{gameId}/status", gameId)
+                mockMvc.perform(get("/api/games/{gameId}", gameId)
                         .header("Authorization", authorizationHeader))
                         .andExpect(status().isOk())
                         .andExpect(jsonPath("$.data.status").value("ended"))
@@ -308,9 +308,9 @@ class FivePlayerGameControllerTest {
                 .getContentAsString();
 
         // 解析响应以获取游戏ID
-        ApiResponse<RoomResponse> roomApiResponse = objectMapper.readValue(roomResponseStr,
-                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomResponse.class));
-        RoomResponse roomResponse = roomApiResponse.getData();
+        Result<RoomResponse> roomResult = objectMapper.readValue(roomResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(Result.class, RoomResponse.class));
+        RoomResponse roomResponse = roomResult.getData();
         String gameId = roomResponse.getGameId().toString();
 
         // 开始第一个任务
@@ -327,9 +327,9 @@ class FivePlayerGameControllerTest {
                 .getContentAsString();
 
         // 解析响应以获取玩家信息
-        ApiResponse<RoomPlayersResponse> playersApiResponse = objectMapper.readValue(playersResponseStr,
-                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomPlayersResponse.class));
-        List<PlayerInfoResponse> players = playersApiResponse.getData().getPlayers();
+        Result<RoomPlayersResponse> playersResult = objectMapper.readValue(playersResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(Result.class, RoomPlayersResponse.class));
+        List<PlayerInfoResponse> players = playersResult.getData().getPlayers();
 
         // 找到刺客玩家
         PlayerInfoResponse assassinPlayer = players.stream()
@@ -348,10 +348,10 @@ class FivePlayerGameControllerTest {
                     .getContentAsString();
 
             // 解析响应以获取任务信息
-            ApiResponse<List<Map<String, Object>>> gameApiResponse = objectMapper.readValue(gameResponseStr,
-                    TypeFactory.defaultInstance().constructParametricType(ApiResponse.class,
+            Result<List<Map<String, Object>>> gameResult = objectMapper.readValue(gameResponseStr,
+                    TypeFactory.defaultInstance().constructParametricType(Result.class,
                             TypeFactory.defaultInstance().constructCollectionType(List.class, Map.class)));
-            List<Map<String, Object>> quests = gameApiResponse.getData();
+            List<Map<String, Object>> quests = gameResult.getData();
 
             // 获取当前任务（第一个未完成的任务）
             Map<String, Object> currentQuest = quests.stream()
@@ -426,7 +426,7 @@ class FivePlayerGameControllerTest {
                 Thread.sleep(200);
                 
                 // 验证游戏状态已更新为ENDED，胜利者为good阵营
-                mockMvc.perform(get("/api/games/{gameId}/status", gameId)
+                mockMvc.perform(get("/api/games/{gameId}", gameId)
                         .header("Authorization", authorizationHeader))
                         .andExpect(status().isOk())
                         .andExpect(jsonPath("$.data.status").value("ended"))
@@ -450,10 +450,10 @@ class FivePlayerGameControllerTest {
                         .getContentAsString();
 
                 // 解析响应以获取游戏中的玩家信息
-                ApiResponse<List<GamePlayer>> gamePlayersApiResponse = objectMapper.readValue(gamePlayersResponseStr,
-                        TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, 
+                Result<List<GamePlayer>> gamePlayersResult = objectMapper.readValue(gamePlayersResponseStr,
+                        TypeFactory.defaultInstance().constructParametricType(Result.class, 
                                 TypeFactory.defaultInstance().constructCollectionType(List.class, GamePlayer.class)));
-                List<GamePlayer> gamePlayers = gamePlayersApiResponse.getData();
+                List<GamePlayer> gamePlayers = gamePlayersResult.getData();
 
                 // 找到游戏中的梅林玩家ID
                 UUID merlinGamePlayerId = gamePlayers.stream()
@@ -474,7 +474,7 @@ class FivePlayerGameControllerTest {
                         .andExpect(jsonPath("$.data").value(true)); // 刺杀成功
 
                 // 验证游戏结果更新为邪恶阵营获胜
-                mockMvc.perform(get("/api/games/{gameId}/status", gameId)
+                mockMvc.perform(get("/api/games/{gameId}", gameId)
                         .header("Authorization", authorizationHeader))
                         .andExpect(status().isOk())
                         .andExpect(jsonPath("$.data.status").value("ended"))
@@ -507,9 +507,9 @@ class FivePlayerGameControllerTest {
                 .getContentAsString();
 
         // 解析响应以获取游戏ID
-        ApiResponse<RoomResponse> roomApiResponse = objectMapper.readValue(roomResponseStr,
-                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomResponse.class));
-        RoomResponse roomResponse = roomApiResponse.getData();
+        Result<RoomResponse> roomResult = objectMapper.readValue(roomResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(Result.class, RoomResponse.class));
+        RoomResponse roomResponse = roomResult.getData();
         String gameId = roomResponse.getGameId().toString();
 
         // 开始第一个任务
@@ -526,9 +526,9 @@ class FivePlayerGameControllerTest {
                 .getContentAsString();
 
         // 解析响应以获取玩家信息
-        ApiResponse<RoomPlayersResponse> playersApiResponse = objectMapper.readValue(playersResponseStr,
-                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomPlayersResponse.class));
-        List<PlayerInfoResponse> players = playersApiResponse.getData().getPlayers();
+        Result<RoomPlayersResponse> playersResult = objectMapper.readValue(playersResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(Result.class, RoomPlayersResponse.class));
+        List<PlayerInfoResponse> players = playersResult.getData().getPlayers();
 
         // 让邪恶阵营破坏3个任务
         for (int round = 1; round <= 3; round++) {
@@ -541,10 +541,10 @@ class FivePlayerGameControllerTest {
                     .getContentAsString();
 
             // 解析响应以获取任务信息
-            ApiResponse<List<Map<String, Object>>> gameApiResponse = objectMapper.readValue(gameResponseStr,
-                    TypeFactory.defaultInstance().constructParametricType(ApiResponse.class,
+            Result<List<Map<String, Object>>> gameResult = objectMapper.readValue(gameResponseStr,
+                    TypeFactory.defaultInstance().constructParametricType(Result.class,
                             TypeFactory.defaultInstance().constructCollectionType(List.class, Map.class)));
-            List<Map<String, Object>> quests = gameApiResponse.getData();
+            List<Map<String, Object>> quests = gameResult.getData();
 
             // 获取当前任务（第一个未完成的任务）
             Map<String, Object> currentQuest = quests.stream()
@@ -619,7 +619,7 @@ class FivePlayerGameControllerTest {
                 Thread.sleep(200);
                 
                 // 验证游戏状态已更新为ENDED，胜利者为evil阵营
-                mockMvc.perform(get("/api/games/{gameId}/status", gameId)
+                mockMvc.perform(get("/api/games/{gameId}", gameId)
                         .header("Authorization", authorizationHeader))
                         .andExpect(status().isOk())
                         .andExpect(jsonPath("$.data.status").value("ended"))
@@ -653,9 +653,9 @@ class FivePlayerGameControllerTest {
                 .getContentAsString();
 
         // 解析响应以获取游戏ID
-        ApiResponse<RoomResponse> roomApiResponse = objectMapper.readValue(roomResponseStr,
-                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomResponse.class));
-        RoomResponse roomResponse = roomApiResponse.getData();
+        Result<RoomResponse> roomResult = objectMapper.readValue(roomResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(Result.class, RoomResponse.class));
+        RoomResponse roomResponse = roomResult.getData();
         String gameId = roomResponse.getGameId().toString();
 
         // 开始第一个任务
@@ -672,9 +672,9 @@ class FivePlayerGameControllerTest {
                 .getContentAsString();
 
         // 解析响应以获取玩家信息
-        ApiResponse<RoomPlayersResponse> playersApiResponse = objectMapper.readValue(playersResponseStr,
-                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomPlayersResponse.class));
-        List<PlayerInfoResponse> players = playersApiResponse.getData().getPlayers();
+        Result<RoomPlayersResponse> playersResult = objectMapper.readValue(playersResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(Result.class, RoomPlayersResponse.class));
+        List<PlayerInfoResponse> players = playersResult.getData().getPlayers();
 
         // 获取当前任务信息以确定真正的队长
         String gameResponseStr = mockMvc.perform(get("/api/games/{gameId}/quests", gameId)
@@ -685,10 +685,10 @@ class FivePlayerGameControllerTest {
                 .getContentAsString();
 
         // 解析响应以获取任务信息
-        ApiResponse<List<Map<String, Object>>> gameApiResponse = objectMapper.readValue(gameResponseStr,
-                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class,
+        Result<List<Map<String, Object>>> gameResult = objectMapper.readValue(gameResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(Result.class,
                         TypeFactory.defaultInstance().constructCollectionType(List.class, Map.class)));
-        List<Map<String, Object>> quests = gameApiResponse.getData();
+        List<Map<String, Object>> quests = gameResult.getData();
 
         // 获取当前任务（第一个未完成的任务）
         Map<String, Object> currentQuest = quests.stream()
@@ -755,10 +755,10 @@ class FivePlayerGameControllerTest {
                 .getContentAsString();
 
         // 解析响应以获取更新后的任务信息
-        ApiResponse<List<Map<String, Object>>> updatedGameApiResponse = objectMapper.readValue(updatedGameResponseStr,
-                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class,
+        Result<List<Map<String, Object>>> updatedGameResult = objectMapper.readValue(updatedGameResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(Result.class,
                         TypeFactory.defaultInstance().constructCollectionType(List.class, Map.class)));
-        List<Map<String, Object>> updatedQuests = updatedGameApiResponse.getData();
+        List<Map<String, Object>> updatedQuests = updatedGameResult.getData();
 
         // 获取当前任务（仍然是第一个未完成的任务）
         Map<String, Object> updatedCurrentQuest = updatedQuests.stream()
@@ -798,9 +798,9 @@ class FivePlayerGameControllerTest {
                 .getContentAsString();
 
         // 解析响应以获取游戏ID
-        ApiResponse<RoomResponse> roomApiResponse = objectMapper.readValue(roomResponseStr,
-                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomResponse.class));
-        RoomResponse roomResponse = roomApiResponse.getData();
+        Result<RoomResponse> roomResult = objectMapper.readValue(roomResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(Result.class, RoomResponse.class));
+        RoomResponse roomResponse = roomResult.getData();
         String gameId = roomResponse.getGameId().toString();
 
         // 开始第一个任务
@@ -817,9 +817,9 @@ class FivePlayerGameControllerTest {
                 .getContentAsString();
 
         // 解析响应以获取玩家信息
-        ApiResponse<RoomPlayersResponse> playersApiResponse = objectMapper.readValue(playersResponseStr,
-                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomPlayersResponse.class));
-        List<PlayerInfoResponse> players = playersApiResponse.getData().getPlayers();
+        Result<RoomPlayersResponse> playersResult = objectMapper.readValue(playersResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(Result.class, RoomPlayersResponse.class));
+        List<PlayerInfoResponse> players = playersResult.getData().getPlayers();
 
         // 连续失败3个任务
         for (int round = 1; round <= 3; round++) {
@@ -832,10 +832,10 @@ class FivePlayerGameControllerTest {
                     .getContentAsString();
 
             // 解析响应以获取任务信息
-            ApiResponse<List<Map<String, Object>>> gameApiResponse = objectMapper.readValue(gameResponseStr,
-                    TypeFactory.defaultInstance().constructParametricType(ApiResponse.class,
+            Result<List<Map<String, Object>>> gameResult = objectMapper.readValue(gameResponseStr,
+                    TypeFactory.defaultInstance().constructParametricType(Result.class,
                             TypeFactory.defaultInstance().constructCollectionType(List.class, Map.class)));
-            List<Map<String, Object>> quests = gameApiResponse.getData();
+            List<Map<String, Object>> quests = gameResult.getData();
 
             // 获取当前任务（第一个未完成的任务）
             Map<String, Object> currentQuest = quests.stream()
@@ -910,7 +910,7 @@ class FivePlayerGameControllerTest {
                 Thread.sleep(200);
                 
                 // 验证游戏状态已更新为ENDED，胜利者为evil阵营
-                mockMvc.perform(get("/api/games/{gameId}/status", gameId)
+                mockMvc.perform(get("/api/games/{gameId}", gameId)
                         .header("Authorization", authorizationHeader))
                         .andExpect(status().isOk())
                         .andExpect(jsonPath("$.data.status").value("ended"))

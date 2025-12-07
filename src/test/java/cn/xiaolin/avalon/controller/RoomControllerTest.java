@@ -1,9 +1,11 @@
 package cn.xiaolin.avalon.controller;
 
-import cn.xiaolin.avalon.dto.ApiResponse;
+import cn.xiaolin.avalon.dto.Result;
 import cn.xiaolin.avalon.dto.CreateRoomRequest;
 import cn.xiaolin.avalon.dto.RoomResponse;
 import cn.xiaolin.avalon.entity.User;
+import cn.xiaolin.avalon.repository.GamePlayerRepository;
+import cn.xiaolin.avalon.repository.GameRepository;
 import cn.xiaolin.avalon.repository.RoomPlayerRepository;
 import cn.xiaolin.avalon.repository.RoomRepository;
 import cn.xiaolin.avalon.repository.UserRepository;
@@ -50,6 +52,12 @@ class RoomControllerTest {
 
     @Autowired
     private RoomPlayerRepository roomPlayerRepository;
+    
+    @Autowired
+    private GameRepository gameRepository;
+    
+    @Autowired
+    private GamePlayerRepository gamePlayerRepository;
 
     @Autowired
     private JwtUtil jwtUtil;
@@ -89,9 +97,17 @@ class RoomControllerTest {
     void tearDown() {
         // 按正确顺序清理测试数据以遵守外键约束
         // 由于数据库表之间存在外键关系，必须按特定顺序删除数据以避免约束冲突
+        // 先删除游戏参与者记录（如果存在）
+        gamePlayerRepository.deleteAll();
+        // 然后删除游戏记录（如果存在）
+        gameRepository.deleteAll();
+        // 接着删除房间玩家记录
         roomPlayerRepository.deleteAll();
+        // 再删除房间记录
         roomRepository.deleteAll();
+        // 最后删除用户记录
         userRepository.deleteAll();
+        // 清理缓存以确保下一个测试的独立性
     }
 
     /**
@@ -134,9 +150,9 @@ class RoomControllerTest {
                 .getContentAsString();
 
         // 验证房间代码格式（6个字符，大写字母和数字）
-        ApiResponse<RoomResponse> apiResponse = objectMapper.readValue(responseStr,
-                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomResponse.class));
-        RoomResponse roomResponse = apiResponse.getData();
+        Result<RoomResponse> Result = objectMapper.readValue(responseStr,
+                TypeFactory.defaultInstance().constructParametricType(Result.class, RoomResponse.class));
+        RoomResponse roomResponse = Result.getData();
         String roomCode = roomResponse.getRoomCode();
         
         // 验证房间代码格式符合规范（6位大写字母+数字）
@@ -154,7 +170,7 @@ class RoomControllerTest {
      * 1. 用户 host 已创建房间，maxPlayers 为 5
      * 2. 用户 player2 已登录，获得有效 Token
      * 3. 房间当前人数小于 5
-     * 请求方法/URL: POST /api/rooms/{roomCode}/join
+     * 请求方法/URL: POST /api/rooms/{roomCode}
      * 请求头: Authorization: Bearer <player2_token>
      * 预期响应: Status Code: 200 OK, success: true, message: "加入房间成功"
      * 实际响应验证点:
@@ -180,14 +196,14 @@ class RoomControllerTest {
                 .getContentAsString();
 
         // 解析响应以获取房间代码
-        ApiResponse<RoomResponse> createApiResponse = objectMapper.readValue(createResponseStr,
-                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomResponse.class));
-        RoomResponse roomResponse = createApiResponse.getData();
+        Result<RoomResponse> createResult = objectMapper.readValue(createResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(Result.class, RoomResponse.class));
+        RoomResponse roomResponse = createResult.getData();
         String roomCode = roomResponse.getRoomCode();
         String roomId = roomResponse.getRoomId().toString();
 
         // 第二个用户加入房间
-        mockMvc.perform(post("/api/rooms/{roomCode}/join", roomCode)
+        mockMvc.perform(post("/api/rooms/{roomCode}", roomCode)
                         .header("Authorization", secondAuthorizationHeader))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -206,7 +222,7 @@ class RoomControllerTest {
      * 前置条件:
      * 1. 房间已存在，maxPlayers 为 5，当前人数也为 5
      * 2. 用户 player6 已登录，获得有效 Token
-     * 请求方法/URL: POST /api/rooms/{roomCode}/join
+     * 请求方法/URL: POST /api/rooms/{roomCode}
      * 请求头: Authorization: Bearer <player6_token>
      * 预期响应: Status Code: 400 Bad Request, success: false, message: "房间已满"
      * 实际响应验证点:
@@ -231,9 +247,9 @@ class RoomControllerTest {
                 .getContentAsString();
 
         // 解析响应以获取房间代码
-        ApiResponse<RoomResponse> createApiResponse = objectMapper.readValue(createResponseStr,
-                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomResponse.class));
-        RoomResponse roomResponse = createApiResponse.getData();
+        Result<RoomResponse> createResult = objectMapper.readValue(createResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(Result.class, RoomResponse.class));
+        RoomResponse roomResponse = createResult.getData();
         String roomCode = roomResponse.getRoomCode();
 
         // 创建4个更多用户以填满房间（总共5个玩家）
@@ -263,22 +279,22 @@ class RoomControllerTest {
 
         // 4个额外用户加入（创建者已经在房间中）
         String token2 = jwtUtil.generateToken(user2.getId(), user2.getUsername());
-        mockMvc.perform(post("/api/rooms/{roomCode}/join", roomCode)
+        mockMvc.perform(post("/api/rooms/{roomCode}", roomCode)
                         .header("Authorization", "Bearer " + token2))
                 .andExpect(status().isOk());
                 
         String token3 = jwtUtil.generateToken(user3.getId(), user3.getUsername());
-        mockMvc.perform(post("/api/rooms/{roomCode}/join", roomCode)
+        mockMvc.perform(post("/api/rooms/{roomCode}", roomCode)
                         .header("Authorization", "Bearer " + token3))
                 .andExpect(status().isOk());
                 
         String token4 = jwtUtil.generateToken(user4.getId(), user4.getUsername());
-        mockMvc.perform(post("/api/rooms/{roomCode}/join", roomCode)
+        mockMvc.perform(post("/api/rooms/{roomCode}", roomCode)
                         .header("Authorization", "Bearer " + token4))
                 .andExpect(status().isOk());
                 
         String token5 = jwtUtil.generateToken(user5.getId(), user5.getUsername());
-        mockMvc.perform(post("/api/rooms/{roomCode}/join", roomCode)
+        mockMvc.perform(post("/api/rooms/{roomCode}", roomCode)
                         .header("Authorization", "Bearer " + token5))
                 .andExpect(status().isOk());
 
@@ -292,7 +308,7 @@ class RoomControllerTest {
         String sixthUserToken = jwtUtil.generateToken(sixthUser.getId(), sixthUser.getUsername());
         String sixthAuthorizationHeader = "Bearer " + sixthUserToken;
 
-        mockMvc.perform(post("/api/rooms/{roomCode}/join", roomCode)
+        mockMvc.perform(post("/api/rooms/{roomCode}", roomCode)
                         .header("Authorization", sixthAuthorizationHeader))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
@@ -386,9 +402,9 @@ class RoomControllerTest {
                 .getContentAsString();
 
         // 解析响应以获取房间代码
-        ApiResponse<RoomResponse> apiResponse = objectMapper.readValue(responseStr,
-                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomResponse.class));
-        RoomResponse roomResponse = apiResponse.getData();
+        Result<RoomResponse> Result = objectMapper.readValue(responseStr,
+                TypeFactory.defaultInstance().constructParametricType(Result.class, RoomResponse.class));
+        RoomResponse roomResponse = Result.getData();
         String roomCode = roomResponse.getRoomCode();
 
         // 现在测试通过代码获取房间
@@ -430,9 +446,9 @@ class RoomControllerTest {
                 .getContentAsString();
 
         // 解析响应以获取房间ID
-        ApiResponse<RoomResponse> apiResponse = objectMapper.readValue(responseStr,
-                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomResponse.class));
-        RoomResponse roomResponse = apiResponse.getData();
+        Result<RoomResponse> Result = objectMapper.readValue(responseStr,
+                TypeFactory.defaultInstance().constructParametricType(Result.class, RoomResponse.class));
+        RoomResponse roomResponse = Result.getData();
         String roomId = roomResponse.getRoomId().toString();
 
         // 现在测试通过ID获取房间
@@ -476,9 +492,9 @@ class RoomControllerTest {
                 .getContentAsString();
 
         // 解析响应以获取房间代码
-        ApiResponse<RoomResponse> apiResponse = objectMapper.readValue(responseStr,
-                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomResponse.class));
-        RoomResponse roomResponse = apiResponse.getData();
+        Result<RoomResponse> Result = objectMapper.readValue(responseStr,
+                TypeFactory.defaultInstance().constructParametricType(Result.class, RoomResponse.class));
+        RoomResponse roomResponse = Result.getData();
         String roomCode = roomResponse.getRoomCode();
 
         // 现在测试获取房间玩家列表
@@ -536,7 +552,7 @@ class RoomControllerTest {
      * 1. 用户 host 已创建房间
      * 2. 用户 player2 已加入房间
      * 3. 用户 host 已登录，获得有效 Token
-     * 请求方法/URL: DELETE /api/rooms/{roomCode}/leave
+     * 请求方法/URL: DELETE /api/rooms/{roomCode}
      * 请求头: Authorization: Bearer <host_token>
      * 预期响应: Status Code: 200 OK, success: true, message: "离开房间成功"
      * 实际响应验证点:
@@ -560,19 +576,19 @@ class RoomControllerTest {
                 .getContentAsString();
 
         // 解析响应以获取房间代码
-        ApiResponse<RoomResponse> createApiResponse = objectMapper.readValue(responseStr,
-                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomResponse.class));
-        RoomResponse roomResponse = createApiResponse.getData();
+        Result<RoomResponse> createResult = objectMapper.readValue(responseStr,
+                TypeFactory.defaultInstance().constructParametricType(Result.class, RoomResponse.class));
+        RoomResponse roomResponse = createResult.getData();
         String roomCode = roomResponse.getRoomCode();
         String roomId = roomResponse.getRoomId().toString();
 
         // 第二个用户加入房间
-        mockMvc.perform(post("/api/rooms/{roomCode}/join", roomCode)
+        mockMvc.perform(post("/api/rooms/{roomCode}", roomCode)
                         .header("Authorization", secondAuthorizationHeader))
                 .andExpect(status().isOk());
 
         // 现在测试离开房间（创建者离开）
-        mockMvc.perform(delete("/api/rooms/{roomCode}/leave", roomCode)
+        mockMvc.perform(delete("/api/rooms/{roomCode}", roomCode)
                         .header("Authorization", authorizationHeader))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -590,7 +606,7 @@ class RoomControllerTest {
      * 1. 用户 host 已创建房间
      * 2. 用户 player2 已加入房间
      * 3. 用户 player2 已登录，获得有效 Token
-     * 请求方法/URL: DELETE /api/rooms/{roomCode}/leave
+     * 请求方法/URL: DELETE /api/rooms/{roomCode}
      * 请求头: Authorization: Bearer <player2_token>
      * 预期响应: Status Code: 200 OK, success: true, message: "离开房间成功"
      * 实际响应验证点:
@@ -614,19 +630,19 @@ class RoomControllerTest {
                 .getContentAsString();
 
         // 解析响应以获取房间代码
-        ApiResponse<RoomResponse> createApiResponse = objectMapper.readValue(responseStr,
-                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomResponse.class));
-        RoomResponse roomResponse = createApiResponse.getData();
+        Result<RoomResponse> createResult = objectMapper.readValue(responseStr,
+                TypeFactory.defaultInstance().constructParametricType(Result.class, RoomResponse.class));
+        RoomResponse roomResponse = createResult.getData();
         String roomCode = roomResponse.getRoomCode();
         String roomId = roomResponse.getRoomId().toString();
 
         // 第二个用户加入房间
-        mockMvc.perform(post("/api/rooms/{roomCode}/join", roomCode)
+        mockMvc.perform(post("/api/rooms/{roomCode}", roomCode)
                         .header("Authorization", secondAuthorizationHeader))
                 .andExpect(status().isOk());
 
         // 现在测试离开房间（非创建者离开）
-        mockMvc.perform(delete("/api/rooms/{roomCode}/leave", roomCode)
+        mockMvc.perform(delete("/api/rooms/{roomCode}", roomCode)
                         .header("Authorization", secondAuthorizationHeader))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -641,7 +657,7 @@ class RoomControllerTest {
      * ROOM-JOIN-TC-003: 加入不存在的房间
      * 测试目的: 验证当用户尝试加入不存在的房间时，系统会返回错误
      * 前置条件: 用户已登录，获得有效 Token
-     * 请求方法/URL: POST /api/rooms/NONEXIST/join
+     * 请求方法/URL: POST /api/rooms/NONEXIST
      * 请求头: Authorization: Bearer <valid_token>
      * 预期响应: Status Code: 400 Bad Request, success: false, message: "房间不存在"
      * 实际响应验证点:
@@ -653,7 +669,7 @@ class RoomControllerTest {
     @Test
     void whenUserJoinsNonExistentRoom_thenReturnsError() throws Exception {
         // 尝试加入不存在的房间
-        mockMvc.perform(post("/api/rooms/{roomCode}/join", "NONEXIST")
+        mockMvc.perform(post("/api/rooms/{roomCode}", "NONEXIST")
                         .header("Authorization", authorizationHeader))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))

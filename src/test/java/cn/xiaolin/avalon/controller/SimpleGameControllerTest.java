@@ -105,9 +105,9 @@ class SimpleGameControllerTest {
                 .getContentAsString();
 
         // 解析响应以获取房间信息
-        ApiResponse<RoomResponse> apiResponse = objectMapper.readValue(responseStr,
-                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomResponse.class));
-        RoomResponse roomResponse = apiResponse.getData();
+        Result<RoomResponse> Result = objectMapper.readValue(responseStr,
+                TypeFactory.defaultInstance().constructParametricType(Result.class, RoomResponse.class));
+        RoomResponse roomResponse = Result.getData();
         roomCode = roomResponse.getRoomCode();
         roomId = roomResponse.getRoomId().toString();
 
@@ -120,8 +120,8 @@ class SimpleGameControllerTest {
             player = userRepository.save(player);
 
             String playerToken = jwtUtil.generateToken(player.getId(), player.getUsername());
-            mockMvc.perform(post("/api/rooms/{roomCode}/join", roomCode)
-                            .header("Authorization", "Bearer " + playerToken))
+            mockMvc.perform(post("/api/rooms/{roomCode}", roomCode)
+                        .header("Authorization", "Bearer " + playerToken))
                     .andExpect(status().isOk());
         }
     }
@@ -199,9 +199,9 @@ class SimpleGameControllerTest {
                 .getContentAsString();
 
         // 解析响应以获取游戏ID
-        ApiResponse<RoomResponse> roomApiResponse = objectMapper.readValue(roomResponseStr,
-                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomResponse.class));
-        RoomResponse roomResponse = roomApiResponse.getData();
+        Result<RoomResponse> roomResult = objectMapper.readValue(roomResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(Result.class, RoomResponse.class));
+        RoomResponse roomResponse = roomResult.getData();
         String gameId = roomResponse.getGameId().toString();
         
         // When & Then - 开始第一个任务
@@ -244,9 +244,9 @@ class SimpleGameControllerTest {
                 .getContentAsString();
 
         // 解析响应以获取游戏ID
-        ApiResponse<RoomResponse> roomApiResponse = objectMapper.readValue(roomResponseStr,
-                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomResponse.class));
-        RoomResponse roomResponse = roomApiResponse.getData();
+        Result<RoomResponse> roomResult = objectMapper.readValue(roomResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(Result.class, RoomResponse.class));
+        RoomResponse roomResponse = roomResult.getData();
         String gameId = roomResponse.getGameId().toString();
         
         // When & Then - 使用统一接口开始第一个任务
@@ -289,9 +289,9 @@ class SimpleGameControllerTest {
                 .getContentAsString();
 
         // 解析响应以获取游戏ID
-        ApiResponse<RoomResponse> roomApiResponse = objectMapper.readValue(roomResponseStr,
-                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomResponse.class));
-        RoomResponse roomResponse = roomApiResponse.getData();
+        Result<RoomResponse> roomResult = objectMapper.readValue(roomResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(Result.class, RoomResponse.class));
+        RoomResponse roomResponse = roomResult.getData();
         String gameId = roomResponse.getGameId().toString();
         
         // 先开始第一个任务
@@ -327,9 +327,9 @@ class SimpleGameControllerTest {
                 .getContentAsString();
 
         // 解析响应以获取游戏ID
-        ApiResponse<RoomResponse> roomApiResponse = objectMapper.readValue(roomResponseStr,
-                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomResponse.class));
-        RoomResponse roomResponse = roomApiResponse.getData();
+        Result<RoomResponse> roomResult = objectMapper.readValue(roomResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(Result.class, RoomResponse.class));
+        RoomResponse roomResponse = roomResult.getData();
         String gameId = roomResponse.getGameId().toString();
 
         // When & Then - 获取角色信息
@@ -365,9 +365,9 @@ class SimpleGameControllerTest {
                 .getContentAsString();
 
         // 解析响应以获取游戏ID
-        ApiResponse<RoomResponse> roomApiResponse = objectMapper.readValue(roomResponseStr,
-                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomResponse.class));
-        RoomResponse roomResponse = roomApiResponse.getData();
+        Result<RoomResponse> roomResult = objectMapper.readValue(roomResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(Result.class, RoomResponse.class));
+        RoomResponse roomResponse = roomResult.getData();
         String gameId = roomResponse.getGameId().toString();
 
         // 创建一个不属于房间的用户
@@ -428,9 +428,9 @@ class SimpleGameControllerTest {
                 .getContentAsString();
 
         // 解析响应以获取游戏ID
-        ApiResponse<RoomResponse> roomApiResponse = objectMapper.readValue(roomResponseStr,
-                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomResponse.class));
-        RoomResponse roomResponse = roomApiResponse.getData();
+        Result<RoomResponse> roomResult = objectMapper.readValue(roomResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(Result.class, RoomResponse.class));
+        RoomResponse roomResponse = roomResult.getData();
         String gameId = roomResponse.getGameId().toString();
         
         // 开始第一个任务
@@ -446,9 +446,9 @@ class SimpleGameControllerTest {
                 .getContentAsString();
         
         // 解析响应以获取玩家信息
-        ApiResponse<RoomPlayersResponse> playersApiResponse = objectMapper.readValue(playersResponseStr,
-                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomPlayersResponse.class));
-        List<PlayerInfoResponse> players = playersApiResponse.getData().getPlayers();
+        Result<RoomPlayersResponse> playersResult = objectMapper.readValue(playersResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(Result.class, RoomPlayersResponse.class));
+        List<PlayerInfoResponse> players = playersResult.getData().getPlayers();
         
         // 构造队伍提议请求，选择前两个玩家
         List<UUID> selectedPlayerIds = players.stream()
@@ -493,9 +493,9 @@ class SimpleGameControllerTest {
                 .getContentAsString();
 
         // 解析响应以获取游戏ID
-        ApiResponse<RoomResponse> roomApiResponse = objectMapper.readValue(roomResponseStr,
-                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomResponse.class));
-        RoomResponse roomResponse = roomApiResponse.getData();
+        Result<RoomResponse> roomResult = objectMapper.readValue(roomResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(Result.class, RoomResponse.class));
+        RoomResponse roomResponse = roomResult.getData();
         String gameId = roomResponse.getGameId().toString();
         
         // 开始第一个任务
@@ -511,9 +511,9 @@ class SimpleGameControllerTest {
                 .getContentAsString();
         
         // 解析响应以获取玩家信息
-        ApiResponse<RoomPlayersResponse> playersApiResponse = objectMapper.readValue(playersResponseStr,
-                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomPlayersResponse.class));
-        List<PlayerInfoResponse> players = playersApiResponse.getData().getPlayers();
+        Result<RoomPlayersResponse> playersResult = objectMapper.readValue(playersResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(Result.class, RoomPlayersResponse.class));
+        List<PlayerInfoResponse> players = playersResult.getData().getPlayers();
         
         // 获取当前任务信息以确定真正的队长
         String gameResponseStr = mockMvc.perform(get("/api/games/{gameId}/quests", gameId)
@@ -524,10 +524,10 @@ class SimpleGameControllerTest {
                 .getContentAsString();
         
         // 解析响应以获取任务信息
-        ApiResponse<List<Map<String, Object>>> gameApiResponse = objectMapper.readValue(gameResponseStr,
-                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, 
+        Result<List<Map<String, Object>>> gameResult = objectMapper.readValue(gameResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(Result.class, 
                     TypeFactory.defaultInstance().constructCollectionType(List.class, Map.class)));
-        List<Map<String, Object>> quests = gameApiResponse.getData();
+        List<Map<String, Object>> quests = gameResult.getData();
         
         // 获取当前任务（第一个未完成的任务）
         Map<String, Object> currentQuest = quests.stream()
@@ -591,9 +591,9 @@ class SimpleGameControllerTest {
                 .getContentAsString();
 
         // 解析响应以获取游戏ID
-        ApiResponse<RoomResponse> roomApiResponse = objectMapper.readValue(roomResponseStr,
-                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomResponse.class));
-        RoomResponse roomResponse = roomApiResponse.getData();
+        Result<RoomResponse> roomResult = objectMapper.readValue(roomResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(Result.class, RoomResponse.class));
+        RoomResponse roomResponse = roomResult.getData();
         String gameId = roomResponse.getGameId().toString();
         
         // 开始第一个任务
@@ -609,9 +609,9 @@ class SimpleGameControllerTest {
                 .getContentAsString();
         
         // 解析响应以获取玩家信息
-        ApiResponse<RoomPlayersResponse> playersApiResponse = objectMapper.readValue(playersResponseStr,
-                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomPlayersResponse.class));
-        List<PlayerInfoResponse> players = playersApiResponse.getData().getPlayers();
+        Result<RoomPlayersResponse> playersResult = objectMapper.readValue(playersResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(Result.class, RoomPlayersResponse.class));
+        List<PlayerInfoResponse> players = playersResult.getData().getPlayers();
         
         // 构造队伍提议请求，选择前两个玩家
         List<UUID> selectedPlayerIds = players.stream()
@@ -675,9 +675,9 @@ class SimpleGameControllerTest {
                 .getContentAsString();
 
         // 解析响应以获取游戏ID
-        ApiResponse<RoomResponse> roomApiResponse = objectMapper.readValue(roomResponseStr,
-                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomResponse.class));
-        RoomResponse roomResponse = roomApiResponse.getData();
+        Result<RoomResponse> roomResult = objectMapper.readValue(roomResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(Result.class, RoomResponse.class));
+        RoomResponse roomResponse = roomResult.getData();
         String gameId = roomResponse.getGameId().toString();
         
         // 开始第一个任务
@@ -693,9 +693,9 @@ class SimpleGameControllerTest {
                 .getContentAsString();
         
         // 解析响应以获取玩家信息
-        ApiResponse<RoomPlayersResponse> playersApiResponse = objectMapper.readValue(playersResponseStr,
-                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomPlayersResponse.class));
-        List<PlayerInfoResponse> players = playersApiResponse.getData().getPlayers();
+        Result<RoomPlayersResponse> playersResult = objectMapper.readValue(playersResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(Result.class, RoomPlayersResponse.class));
+        List<PlayerInfoResponse> players = playersResult.getData().getPlayers();
         
         // 构造队伍提议请求，选择前两个玩家
         List<UUID> selectedPlayerIds = players.stream()
@@ -766,9 +766,9 @@ class SimpleGameControllerTest {
                 .getContentAsString();
 
         // 解析响应以获取游戏ID
-        ApiResponse<RoomResponse> roomApiResponse = objectMapper.readValue(roomResponseStr,
-                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomResponse.class));
-        RoomResponse roomResponse = roomApiResponse.getData();
+        Result<RoomResponse> roomResult = objectMapper.readValue(roomResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(Result.class, RoomResponse.class));
+        RoomResponse roomResponse = roomResult.getData();
         String gameId = roomResponse.getGameId().toString();
         
         // 开始第一个任务
@@ -784,9 +784,9 @@ class SimpleGameControllerTest {
                 .getContentAsString();
         
         // 解析响应以获取玩家信息
-        ApiResponse<RoomPlayersResponse> playersApiResponse = objectMapper.readValue(playersResponseStr,
-                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomPlayersResponse.class));
-        List<PlayerInfoResponse> players = playersApiResponse.getData().getPlayers();
+        Result<RoomPlayersResponse> playersResult = objectMapper.readValue(playersResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(Result.class, RoomPlayersResponse.class));
+        List<PlayerInfoResponse> players = playersResult.getData().getPlayers();
         
         // 构造队伍提议请求，选择前两个玩家
         List<UUID> selectedPlayerIds = players.stream()
@@ -873,9 +873,9 @@ class SimpleGameControllerTest {
                 .getContentAsString();
 
         // 解析响应以获取游戏ID
-        ApiResponse<RoomResponse> roomApiResponse = objectMapper.readValue(roomResponseStr,
-                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomResponse.class));
-        RoomResponse roomResponse = roomApiResponse.getData();
+        Result<RoomResponse> roomResult = objectMapper.readValue(roomResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(Result.class, RoomResponse.class));
+        RoomResponse roomResponse = roomResult.getData();
         String gameId = roomResponse.getGameId().toString();
         
         // 开始第一个任务
@@ -891,9 +891,9 @@ class SimpleGameControllerTest {
                 .getContentAsString();
         
         // 解析响应以获取玩家信息
-        ApiResponse<RoomPlayersResponse> playersApiResponse = objectMapper.readValue(playersResponseStr,
-                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomPlayersResponse.class));
-        List<PlayerInfoResponse> players = playersApiResponse.getData().getPlayers();
+        Result<RoomPlayersResponse> playersResult = objectMapper.readValue(playersResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(Result.class, RoomPlayersResponse.class));
+        List<PlayerInfoResponse> players = playersResult.getData().getPlayers();
         
         // 构造队伍提议请求，选择前两个玩家
         List<UUID> selectedPlayerIds = players.stream()
@@ -975,9 +975,9 @@ class SimpleGameControllerTest {
                 .getContentAsString();
 
         // 解析响应以获取游戏ID
-        ApiResponse<RoomResponse> roomApiResponse = objectMapper.readValue(roomResponseStr,
-                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomResponse.class));
-        RoomResponse roomResponse = roomApiResponse.getData();
+        Result<RoomResponse> roomResult = objectMapper.readValue(roomResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(Result.class, RoomResponse.class));
+        RoomResponse roomResponse = roomResult.getData();
         String gameId = roomResponse.getGameId().toString();
         
         // 开始第一个任务
@@ -993,9 +993,9 @@ class SimpleGameControllerTest {
                 .getContentAsString();
         
         // 解析响应以获取玩家信息
-        ApiResponse<RoomPlayersResponse> playersApiResponse = objectMapper.readValue(playersResponseStr,
-                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomPlayersResponse.class));
-        List<PlayerInfoResponse> players = playersApiResponse.getData().getPlayers();
+        Result<RoomPlayersResponse> playersResult = objectMapper.readValue(playersResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(Result.class, RoomPlayersResponse.class));
+        List<PlayerInfoResponse> players = playersResult.getData().getPlayers();
         
         // 执行所有5个任务
         for (int round = 1; round <= 5; round++) {
@@ -1008,10 +1008,10 @@ class SimpleGameControllerTest {
                     .getContentAsString();
             
             // 解析响应以获取任务信息
-            ApiResponse<List<Map<String, Object>>> gameApiResponse = objectMapper.readValue(gameResponseStr,
-                    TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, 
+            Result<List<Map<String, Object>>> gameResult = objectMapper.readValue(gameResponseStr,
+                    TypeFactory.defaultInstance().constructParametricType(Result.class, 
                         TypeFactory.defaultInstance().constructCollectionType(List.class, Map.class)));
-            List<Map<String, Object>> quests = gameApiResponse.getData();
+            List<Map<String, Object>> quests = gameResult.getData();
             
             // 获取当前任务（第一个未完成的任务）
             Map<String, Object> currentQuest = quests.stream()
@@ -1114,9 +1114,9 @@ class SimpleGameControllerTest {
                 .getContentAsString();
 
         // 解析响应以获取游戏ID
-        ApiResponse<RoomResponse> roomApiResponse = objectMapper.readValue(roomResponseStr,
-                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomResponse.class));
-        RoomResponse roomResponse = roomApiResponse.getData();
+        Result<RoomResponse> roomResult = objectMapper.readValue(roomResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(Result.class, RoomResponse.class));
+        RoomResponse roomResponse = roomResult.getData();
         String gameId = roomResponse.getGameId().toString();
         
         // 开始第一个任务
@@ -1132,9 +1132,9 @@ class SimpleGameControllerTest {
                 .getContentAsString();
         
         // 解析响应以获取玩家信息
-        ApiResponse<RoomPlayersResponse> playersApiResponse = objectMapper.readValue(playersResponseStr,
-                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomPlayersResponse.class));
-        List<PlayerInfoResponse> players = playersApiResponse.getData().getPlayers();
+        Result<RoomPlayersResponse> playersResult = objectMapper.readValue(playersResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(Result.class, RoomPlayersResponse.class));
+        List<PlayerInfoResponse> players = playersResult.getData().getPlayers();
         
         // 队长提议队伍（选择前两个玩家作为队伍成员）
         List<UUID> selectedPlayerIds = players.stream()
