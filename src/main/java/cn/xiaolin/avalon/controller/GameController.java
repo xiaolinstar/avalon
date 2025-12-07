@@ -84,12 +84,14 @@ public class GameController {
     @GetMapping("/{gameId}/status")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getGameStatus(@PathVariable UUID gameId) {
         try {
-            Game game = gameService.getGameByRoomId(gameId);
+            Game game = gameService.getGameById(gameId);
             Map<String, Object> status = Map.of(
                 "gameId", game.getId(),
                 "status", game.getStatus(),
                 "currentRound", game.getCurrentRound(),
-                "startedAt", game.getStartedAt()
+                "startedAt", game.getStartedAt(),
+                "winner", game.getWinner(),
+                "endedAt", game.getEndedAt()
             );
             return ResponseEntity.ok(ApiResponse.success(status));
         } catch (Exception e) {
@@ -170,7 +172,7 @@ public class GameController {
     @PostMapping("/{gameId}/quests/execute")
     public ResponseEntity<ApiResponse<String>> executeQuest(
             @PathVariable UUID gameId,
-            @RequestParam Integer round,
+//            @RequestParam Integer round,
             @RequestHeader("Authorization") String authorizationHeader,
             @Valid @RequestBody ExecuteQuestRequest request) {
         try {

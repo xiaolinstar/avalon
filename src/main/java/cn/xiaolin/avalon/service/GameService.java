@@ -227,6 +227,11 @@ public class GameService {
         };
     }
 
+    public Game getGameById(UUID gameId) {
+        return gameRepository.findById(gameId)
+            .orElseThrow(() -> new RuntimeException("游戏不存在"));
+    }
+
     public Game getGameByRoomId(UUID roomId) {
         return gameRepository.findByRoomId(roomId)
             .orElseThrow(() -> new RuntimeException("游戏不存在"));
@@ -460,34 +465,72 @@ public class GameService {
             // 所有队员都执行了任务，计算结果
             boolean questSuccess = calculateQuestSuccess(currentQuest, results);
             
-            if (questSuccess) {
-                currentQuest.setStatus(QuestStatus.COMPLETED.getValue());
-            } else {
-                currentQuest.setStatus(QuestStatus.FAILED.getValue());
-            }
-            
-            questRepository.save(currentQuest);
-            
             // 进入下一轮或结束游戏
             if (questSuccess) {
-                if (game.getCurrentRound() >= 5) {
+                // 先设置当前任务为完成状态
+                currentQuest.setStatus(QuestStatus.COMPLETED.getValue());
+                questRepository.save(currentQuest);
+                
+                // 重新加载游戏对象以确保数据是最新的
+                game = gameRepository.findById(game.getId()).orElseThrow(() -> new RuntimeException("游戏不存在"));
+                
+                // 重新加载当前任务以确保数据是最新的
+                currentQuest = questRepository.findById(currentQuest.getId()).orElseThrow(() -> new RuntimeException("任务不存在"));
+                
+                // 检查是否已经有5个任务成功完成（包括当前这个）
+                // 注意：我们刚刚设置了当前任务为COMPLETED状态，所以这里应该能正确计数
+                List<Quest> allQuests = questRepository.findByGameOrderByRoundNumber(game);
+                long completedQuests = allQuests.stream()
+                    .filter(q -> Objects.equals(q.getStatus(), QuestStatus.COMPLETED.getValue()))
+                    .count();
+                
+                // 添加调试信息
+                System.out.println("游戏ID: " + game.getId());
+                System.out.println("当前任务轮次: " + currentQuest.getRoundNumber());
+                System.out.println("当前任务状态: " + currentQuest.getStatus());
+                System.out.println("所有任务数量: " + allQuests.size());
+                System.out.println("已完成任务数量: " + completedQuests);
+                
+                if (completedQuests >= 5) {
                     // 正义阵营胜利
+                    System.out.println("正义阵营胜利，结束游戏");
                     endGame(game, "good", "quest_victory");
                 } else {
                     // 进入下一轮
+                    System.out.println("进入下一轮");
                     startNextRound(game);
                 }
             } else {
-                // 检查是否已经有3个任务失败
-                long failedQuests = questRepository.findByGameOrderByRoundNumber(game).stream()
+                // 先设置当前任务为失败状态
+                currentQuest.setStatus(QuestStatus.FAILED.getValue());
+                questRepository.save(currentQuest);
+                
+                // 重新加载游戏对象以确保数据是最新的
+                game = gameRepository.findById(game.getId()).orElseThrow(() -> new RuntimeException("游戏不存在"));
+                
+                // 重新加载当前任务以确保数据是最新的
+                currentQuest = questRepository.findById(currentQuest.getId()).orElseThrow(() -> new RuntimeException("任务不存在"));
+                
+                // 检查是否已经有3个任务失败（包括当前这个）
+                List<Quest> allQuests = questRepository.findByGameOrderByRoundNumber(game);
+                long failedQuests = allQuests.stream()
                     .filter(q -> Objects.equals(q.getStatus(), QuestStatus.FAILED.getValue()))
                     .count();
                 
+                // 添加调试信息
+                System.out.println("游戏ID: " + game.getId());
+                System.out.println("当前任务轮次: " + currentQuest.getRoundNumber());
+                System.out.println("当前任务状态: " + currentQuest.getStatus());
+                System.out.println("所有任务数量: " + allQuests.size());
+                System.out.println("已失败任务数量: " + failedQuests);
+                
                 if (failedQuests >= 3) {
                     // 邪恶阵营胜利
+                    System.out.println("邪恶阵营胜利，结束游戏");
                     endGame(game, "evil", "quest_failure");
                 } else {
                     // 进入下一轮
+                    System.out.println("进入下一轮");
                     startNextRound(game);
                 }
             }
@@ -527,9 +570,11 @@ public class GameService {
     }
 
     private List<GamePlayer> getQuestMembers(Quest quest) {
-        // 这里需要实现获取队伍成员的逻辑
-        // 暂时返回所有玩家，实际应该根据提议的队伍成员
-        return gamePlayerRepository.findByGame(quest.getGame());
+        // 获取当前任务提议的队伍成员
+        return quest.getProposedMembers().stream()
+            .map(user -> gamePlayerRepository.findByGameAndUser(quest.getGame(), user)
+                .orElseThrow(() -> new RuntimeException("玩家不在游戏中")))
+            .collect(Collectors.toList());
     }
 
     private boolean calculateQuestSuccess(Quest quest, List<QuestResult> results) {
@@ -586,5 +631,21 @@ public class GameService {
         game.setWinner(winner);
         game.setEndedAt(LocalDateTime.now());
         gameRepository.save(game);
+        
+        // 更新房间状态为ended
+        Room room = game.getRoom();
+        if (room != null) {
+            room.setStatus(RoomStatus.ENDED.getValue());
+            roomRepository.save(room);
+        }
+        
+        // 发送WebSocket消息通知所有玩家游戏已结束
+        GameMessage message = new GameMessage();
+        message.setType("QUEST_COMPLETED");
+        message.setGameId(game.getId());
+        message.setContent("游戏结束，" + ("good".equals(winner) ? "正义" : "邪恶") + "阵营获胜");
+        message.setTimestamp(System.currentTimeMillis());
+        
+        messagingTemplate.convertAndSend("/topic/game/" + game.getId(), message);
     }
 }

@@ -1,6 +1,7 @@
 package cn.xiaolin.avalon.controller;
 
 import cn.xiaolin.avalon.dto.*;
+import cn.xiaolin.avalon.entity.Quest;
 import cn.xiaolin.avalon.entity.User;
 import cn.xiaolin.avalon.repository.*;
 import cn.xiaolin.avalon.utils.JwtUtil;
@@ -20,6 +21,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -514,9 +516,32 @@ class GameControllerTest {
                 TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomPlayersResponse.class));
         List<PlayerInfoResponse> players = playersApiResponse.getData().getPlayers();
         
-        // 找到一个非队长的玩家
+        // 获取当前任务信息以确定真正的队长
+        String gameResponseStr = mockMvc.perform(get("/api/games/{gameId}/quests", gameId))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        
+        // 解析响应以获取任务信息
+        ApiResponse<List<Map<String, Object>>> gameApiResponse = objectMapper.readValue(gameResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, 
+                    TypeFactory.defaultInstance().constructCollectionType(List.class, Map.class)));
+        List<Map<String, Object>> quests = gameApiResponse.getData();
+        
+        // 获取当前任务（第一个未完成的任务）
+        Map<String, Object> currentQuest = quests.stream()
+                .filter(q -> "proposing".equals(q.get("status")))
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("未找到当前任务"));
+        
+        // 获取队长信息
+        Map<String, Object> leader = (Map<String, Object>) currentQuest.get("leader");
+        String leaderId = (String) leader.get("id");
+        
+        // 找到非队长的玩家（与当前任务队长不同的玩家）
         PlayerInfoResponse nonLeader = players.stream()
-                .filter(p -> !p.getIsHost())
+                .filter(p -> !p.getPlayerId().toString().equals(leaderId))
                 .findFirst()
                 .orElseThrow(() -> new RuntimeException("未找到非队长玩家"));
         
@@ -614,7 +639,7 @@ class GameControllerTest {
         
         // 构造投票请求
         VoteRequest voteRequest = new VoteRequest();
-        voteRequest.setVoteType("APPROVE");
+        voteRequest.setVoteType("approve");
         
         // When & Then - 玩家投票
         mockMvc.perform(post("/api/games/{gameId}/vote", gameId)
@@ -698,7 +723,7 @@ class GameControllerTest {
         
         // 构造投票请求
         VoteRequest voteRequest = new VoteRequest();
-        voteRequest.setVoteType("APPROVE");
+        voteRequest.setVoteType("approve");
         
         // 第一次投票
         mockMvc.perform(post("/api/games/{gameId}/vote", gameId)
@@ -930,4 +955,254 @@ class GameControllerTest {
                 .convertAndSend(eq("/topic/game/" + gameId), (Object) argThat(argument -> 
                     argument instanceof GameMessage && "TEAM_REJECTED".equals(((GameMessage) argument).getType())));
     }
+    
+    /**
+     * QUEST-EXECUTION-TC-001: 成功执行任务使正义阵营获胜
+     * 测试目的: 验证当正义阵营成功执行所有任务时，游戏正确结束并宣布正义阵营获胜。
+     */
+    @Test
+    void whenGoodTeamSuccessfullyCompletesAllQuests_thenGameEndsWithGoodVictory() throws Exception {
+        // 首先开始游戏
+        mockMvc.perform(post("/api/games/{roomId}/start", roomId)
+                        .header("Authorization", authorizationHeader))
+                .andExpect(status().isOk());
+
+        // 获取实际的游戏ID
+        String roomResponseStr = mockMvc.perform(get("/api/rooms/{roomCode}", roomCode))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        // 解析响应以获取游戏ID
+        ApiResponse<RoomResponse> roomApiResponse = objectMapper.readValue(roomResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomResponse.class));
+        RoomResponse roomResponse = roomApiResponse.getData();
+        String gameId = roomResponse.getGameId().toString();
+        
+        // 开始第一个任务
+        mockMvc.perform(post("/api/games/{gameId}/quests?isFirstQuest=true", gameId)
+                        .header("Authorization", authorizationHeader))
+                .andExpect(status().isOk());
+        
+        // 获取房间中的所有玩家ID
+        String playersResponseStr = mockMvc.perform(get("/api/rooms/{roomCode}/players", roomCode))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        
+        // 解析响应以获取玩家信息
+        ApiResponse<RoomPlayersResponse> playersApiResponse = objectMapper.readValue(playersResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomPlayersResponse.class));
+        List<PlayerInfoResponse> players = playersApiResponse.getData().getPlayers();
+        
+        // 执行所有5个任务
+        for (int round = 1; round <= 5; round++) {
+            // 获取当前任务信息以确定真正的队长
+            String gameResponseStr = mockMvc.perform(get("/api/games/{gameId}/quests", gameId))
+                    .andExpect(status().isOk())
+                    .andReturn()
+                    .getResponse()
+                    .getContentAsString();
+            
+            // 解析响应以获取任务信息
+            ApiResponse<List<Map<String, Object>>> gameApiResponse = objectMapper.readValue(gameResponseStr,
+                    TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, 
+                        TypeFactory.defaultInstance().constructCollectionType(List.class, Map.class)));
+            List<Map<String, Object>> quests = gameApiResponse.getData();
+            
+            // 获取当前任务（第一个未完成的任务）
+            Map<String, Object> currentQuest = quests.stream()
+                    .filter(q -> "proposing".equals(q.get("status")))
+                    .findFirst()
+                    .orElseThrow(() -> new RuntimeException("未找到当前任务"));
+            
+            // 获取队长信息
+            Map<String, Object> leader = (Map<String, Object>) currentQuest.get("leader");
+            String leaderId = (String) leader.get("id");
+            
+            // 找到队长玩家
+            PlayerInfoResponse leaderPlayer = players.stream()
+                    .filter(p -> p.getPlayerId().toString().equals(leaderId))
+                    .findFirst()
+                    .orElseThrow(() -> new RuntimeException("未找到队长玩家"));
+            
+            // 为队长玩家生成JWT令牌
+            String leaderToken = "Bearer " + jwtUtil.generateToken(leaderPlayer.getPlayerId(), leaderPlayer.getUsername());
+            
+            // 队长提议队伍（根据轮次选择正确的玩家数）
+            int requiredPlayers = getRequiredPlayersForRound(round);
+            List<UUID> selectedPlayerIds = players.stream()
+                    .limit(requiredPlayers)
+                    .map(PlayerInfoResponse::getPlayerId)
+                    .collect(Collectors.toList());
+            
+            ProposeTeamRequest proposeRequest = new ProposeTeamRequest();
+            proposeRequest.setPlayerIds(selectedPlayerIds);
+            
+            // 队长提议队伍
+            mockMvc.perform(post("/api/games/{gameId}/propose-team", gameId)
+                            .header("Authorization", leaderToken)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(proposeRequest)))
+                    .andExpect(status().isOk());
+            
+            // 所有玩家投票赞成
+            for (PlayerInfoResponse player : players) {
+                String voterToken = "Bearer " + jwtUtil.generateToken(player.getPlayerId(), player.getUsername());
+                
+                VoteRequest voteRequest = new VoteRequest();
+                voteRequest.setVoteType("approve");
+                
+                mockMvc.perform(post("/api/games/{gameId}/vote", gameId)
+                                .header("Authorization", voterToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(voteRequest)))
+                        .andExpect(status().isOk());
+            }
+            
+            // 只有队伍成员执行任务
+            for (PlayerInfoResponse player : players) {
+                // 检查玩家是否在提议的队伍中
+                if (selectedPlayerIds.contains(player.getPlayerId())) {
+                    String executorToken = "Bearer " + jwtUtil.generateToken(player.getPlayerId(), player.getUsername());
+                    
+                    ExecuteQuestRequest executeRequest = new ExecuteQuestRequest();
+                    executeRequest.setSuccess(true); // 任务成功
+                    
+                    mockMvc.perform(post("/api/games/{gameId}/quests/execute", gameId)
+                                    .header("Authorization", executorToken)
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content(objectMapper.writeValueAsString(executeRequest)))
+                            .andExpect(status().isOk());
+                }
+            }
+            
+            // 检查游戏是否结束（第5轮之后应该结束）
+            if (round == 5) {
+                // 验证游戏状态已更新为ENDED
+                mockMvc.perform(get("/api/rooms/{roomCode}", roomCode))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.data.status").value("ended"));
+                        
+                // 验证WebSocket消息已发送
+                verify(messagingTemplate, atLeastOnce())
+                        .convertAndSend(eq("/topic/game/" + gameId), (Object) argThat(argument -> 
+                            argument instanceof GameMessage && "QUEST_COMPLETED".equals(((GameMessage) argument).getType())));
+            }
+        }
+    }
+    
+    /**
+     * QUEST-EXECUTION-TC-002: 成功执行单个任务
+     * 测试目的: 验证当正义阵营成功执行单个任务时，任务正确完成并进入下一轮。
+     */
+    @Test
+    void whenGoodTeamSuccessfullyCompletesSingleQuest_thenQuestCompletes() throws Exception {
+        // 首先开始游戏
+        mockMvc.perform(post("/api/games/{roomId}/start", roomId)
+                        .header("Authorization", authorizationHeader))
+                .andExpect(status().isOk());
+
+        // 获取实际的游戏ID
+        String roomResponseStr = mockMvc.perform(get("/api/rooms/{roomCode}", roomCode))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        // 解析响应以获取游戏ID
+        ApiResponse<RoomResponse> roomApiResponse = objectMapper.readValue(roomResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomResponse.class));
+        RoomResponse roomResponse = roomApiResponse.getData();
+        String gameId = roomResponse.getGameId().toString();
+        
+        // 开始第一个任务
+        mockMvc.perform(post("/api/games/{gameId}/quests?isFirstQuest=true", gameId)
+                        .header("Authorization", authorizationHeader))
+                .andExpect(status().isOk());
+        
+        // 获取房间中的所有玩家ID
+        String playersResponseStr = mockMvc.perform(get("/api/rooms/{roomCode}/players", roomCode))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        
+        // 解析响应以获取玩家信息
+        ApiResponse<RoomPlayersResponse> playersApiResponse = objectMapper.readValue(playersResponseStr,
+                TypeFactory.defaultInstance().constructParametricType(ApiResponse.class, RoomPlayersResponse.class));
+        List<PlayerInfoResponse> players = playersApiResponse.getData().getPlayers();
+        
+        // 队长提议队伍（选择前两个玩家作为队伍成员）
+        List<UUID> selectedPlayerIds = players.stream()
+                .limit(2)
+                .map(PlayerInfoResponse::getPlayerId)
+                .collect(Collectors.toList());
+        
+        ProposeTeamRequest proposeRequest = new ProposeTeamRequest();
+        proposeRequest.setPlayerIds(selectedPlayerIds);
+        
+        // 队长提议队伍
+        mockMvc.perform(post("/api/games/{gameId}/propose-team", gameId)
+                        .header("Authorization", authorizationHeader)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(proposeRequest)))
+                .andExpect(status().isOk());
+        
+        // 所有玩家投票赞成
+        for (PlayerInfoResponse player : players) {
+            String voterToken = "Bearer " + jwtUtil.generateToken(player.getPlayerId(), player.getUsername());
+            
+            VoteRequest voteRequest = new VoteRequest();
+            voteRequest.setVoteType("approve");
+            
+            mockMvc.perform(post("/api/games/{gameId}/vote", gameId)
+                            .header("Authorization", voterToken)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(voteRequest)))
+                    .andExpect(status().isOk());
+        }
+        
+        // 只有队伍成员执行任务
+        for (PlayerInfoResponse player : players) {
+            // 检查玩家是否在提议的队伍中
+            if (selectedPlayerIds.contains(player.getPlayerId())) {
+                String executorToken = "Bearer " + jwtUtil.generateToken(player.getPlayerId(), player.getUsername());
+                
+                ExecuteQuestRequest executeRequest = new ExecuteQuestRequest();
+                executeRequest.setSuccess(true); // 任务成功
+                
+                mockMvc.perform(post("/api/games/{gameId}/quests/execute", gameId)
+                                .header("Authorization", executorToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(executeRequest)))
+                        .andExpect(status().isOk());
+            }
+        }
+        
+        // 验证任务完成并进入下一轮
+        mockMvc.perform(get("/api/rooms/{roomCode}", roomCode))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("playing"));
+                
+        // 验证WebSocket消息已发送
+        verify(messagingTemplate, atLeastOnce())
+                .convertAndSend(eq("/topic/game/" + gameId), (Object) argThat(argument -> 
+                    argument instanceof GameMessage && "NEXT_ROUND_STARTED".equals(((GameMessage) argument).getType())));
+    }
+    
+    /**
+     * 根据轮次获取所需玩家数（5人游戏配置）
+     * @param round 轮次
+     * @return 所需玩家数
+     */
+    private int getRequiredPlayersForRound(int round) {
+        return switch (round) {
+            case 2, 4, 5 -> 3;
+            default -> 2;
+        };
+    }
+
 }
