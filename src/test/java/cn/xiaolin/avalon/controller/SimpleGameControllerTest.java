@@ -1,7 +1,6 @@
 package cn.xiaolin.avalon.controller;
 
 import cn.xiaolin.avalon.dto.*;
-import cn.xiaolin.avalon.entity.Quest;
 import cn.xiaolin.avalon.entity.User;
 import cn.xiaolin.avalon.repository.*;
 import cn.xiaolin.avalon.utils.JwtUtil;
@@ -37,7 +36,7 @@ import static org.mockito.Mockito.*;
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
-class GameControllerTest {
+class SimpleGameControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
@@ -517,7 +516,8 @@ class GameControllerTest {
         List<PlayerInfoResponse> players = playersApiResponse.getData().getPlayers();
         
         // 获取当前任务信息以确定真正的队长
-        String gameResponseStr = mockMvc.perform(get("/api/games/{gameId}/quests", gameId))
+        String gameResponseStr = mockMvc.perform(get("/api/games/{gameId}/quests", gameId)
+                        .header("Authorization", authorizationHeader))
                 .andExpect(status().isOk())
                 .andReturn()
                 .getResponse()
@@ -1000,7 +1000,8 @@ class GameControllerTest {
         // 执行所有5个任务
         for (int round = 1; round <= 5; round++) {
             // 获取当前任务信息以确定真正的队长
-            String gameResponseStr = mockMvc.perform(get("/api/games/{gameId}/quests", gameId))
+            String gameResponseStr = mockMvc.perform(get("/api/games/{gameId}/quests", gameId)
+                            .header("Authorization", authorizationHeader))
                     .andExpect(status().isOk())
                     .andReturn()
                     .getResponse()

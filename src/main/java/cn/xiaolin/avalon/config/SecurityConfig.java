@@ -34,8 +34,6 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/api/rooms/**").permitAll()
-                .requestMatchers("/api/games/*/status").permitAll() // 允许访问游戏状态端点
-                .requestMatchers("/api/games/*/quests").permitAll() // 允许访问游戏任务端点
                 .requestMatchers("/api/test/**").permitAll() // 添加测试端点
                 .requestMatchers("/ws/**").permitAll()
                 .requestMatchers("/").permitAll()

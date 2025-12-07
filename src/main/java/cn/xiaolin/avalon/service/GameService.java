@@ -228,8 +228,12 @@ public class GameService {
     }
 
     public Game getGameById(UUID gameId) {
-        return gameRepository.findById(gameId)
-            .orElseThrow(() -> new RuntimeException("游戏不存在"));
+        Optional<Game> gameOpt = gameRepository.findById(gameId);
+        if (gameOpt.isPresent()) {
+            return gameOpt.get();
+        } else {
+            throw new RuntimeException("游戏不存在");
+        }
     }
 
     public Game getGameByRoomId(UUID roomId) {
@@ -491,7 +495,7 @@ public class GameService {
                 System.out.println("所有任务数量: " + allQuests.size());
                 System.out.println("已完成任务数量: " + completedQuests);
                 
-                if (completedQuests >= 5) {
+                if (completedQuests >= 3) {
                     // 正义阵营胜利
                     System.out.println("正义阵营胜利，结束游戏");
                     endGame(game, "good", "quest_victory");

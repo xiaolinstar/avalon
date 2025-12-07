@@ -85,17 +85,26 @@ public class GameController {
     public ResponseEntity<ApiResponse<Map<String, Object>>> getGameStatus(@PathVariable UUID gameId) {
         try {
             Game game = gameService.getGameById(gameId);
-            Map<String, Object> status = Map.of(
+            
+            // 确保不会出现空值
+            String status = game.getStatus() != null ? game.getStatus() : "";
+            String winner = game.getWinner() != null ? game.getWinner() : "";
+            
+            Map<String, Object> statusMap = Map.of(
                 "gameId", game.getId(),
-                "status", game.getStatus(),
-                "currentRound", game.getCurrentRound(),
+                "status", status,
+                "currentRound", game.getCurrentRound() != null ? game.getCurrentRound() : 0,
                 "startedAt", game.getStartedAt(),
-                "winner", game.getWinner(),
+                "winner", winner,
                 "endedAt", game.getEndedAt()
             );
-            return ResponseEntity.ok(ApiResponse.success(status));
+            
+            return ResponseEntity.ok(ApiResponse.success(statusMap));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+            // 打印完整的堆栈跟踪
+            e.printStackTrace();
+            // 返回更详细的错误信息
+            return ResponseEntity.badRequest().body(ApiResponse.error("获取游戏状态失败: " + e.getClass().getName() + " - " + e.getMessage()));
         }
     }
 
