@@ -38,6 +38,9 @@ public class SecurityConfig {
                 .requestMatchers("/ws/**").permitAll()
                 .requestMatchers("/").permitAll()
                 .requestMatchers("/error").permitAll()
+                .requestMatchers("/swagger-ui/**").permitAll() // 允许Swagger UI访问
+                .requestMatchers("/v3/api-docs/**").permitAll() // 允许Swagger API文档访问
+                .requestMatchers("/swagger-ui.html").permitAll() // 允许Swagger UI主页面访问
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
