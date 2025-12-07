@@ -27,14 +27,48 @@
 
 ## 4. 技术实现方案
 
-### 4.1 数据模型扩展
+### 4.1 数据模型设计
 
-#### Quest实体扩展
+#### 新增Proposal实体
+```java
+@Entity
+@Table(name = "proposals")
+public class Proposal {
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
+    
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "quest_id", nullable = false)
+    private Quest quest;
+    
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "leader_id", nullable = false)
+    private User leader;
+    
+    @ManyToMany
+    @JoinTable(
+        name = "proposal_members",
+        joinColumns = @JoinColumn(name = "proposal_id"),
+        inverseJoinColumns = @JoinColumn(name = "user_id")
+    )
+    private List<User> proposedMembers;
+    
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+}
+```
+
+#### 修改Quest实体
 ```java
 public class Quest {
     // 现有字段...
     
-    // 提议的队伍成员
+    // 与Proposal的关联
+    @OneToMany(mappedBy = "quest", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<Proposal> proposals;
+    
+    // 提议的队伍成员（仅用于向后兼容）
     @ManyToMany
     @JoinTable(
         name = "quest_proposed_members",
@@ -42,17 +76,10 @@ public class Quest {
         inverseJoinColumns = @JoinColumn(name = "user_id")
     )
     private List<User> proposedMembers;
-    
-    // 当前阶段 (PROPOSING, VOTING, EXECUTING)
-    private String status;
-    
-    // 投票结果
-    @OneToMany(mappedBy = "quest", cascade = CascadeType.ALL)
-    private List<Vote> votes;
 }
 ```
 
-#### 新增Vote实体
+#### 修改Vote实体
 ```java
 @Entity
 @Table(name = "votes")
@@ -61,20 +88,25 @@ public class Vote {
     @GeneratedValue
     private UUID id;
     
+    // 与Quest关联（向后兼容）
     @ManyToOne
     @JoinColumn(name = "quest_id")
     private Quest quest;
+    
+    // 与Proposal关联（新设计）
+    @ManyToOne
+    @JoinColumn(name = "proposal_id")
+    private Proposal proposal;
     
     @ManyToOne
     @JoinColumn(name = "player_id")
     private User player;
     
-    // true表示赞成，false表示反对
-    private boolean approve;
+    // 投票类型（赞成/反对）
+    @Column(name = "vote_type", nullable = false, length = 10)
+    private String voteType;
     
     private LocalDateTime votedAt;
-    
-    // getters and setters...
 }
 ```
 
@@ -89,7 +121,7 @@ public class Vote {
  * @param proposedMemberIds 提议的成员ID列表
  */
 @Transactional
-public Quest proposeTeam(UUID gameId, UUID leaderId, List<UUID> proposedMemberIds) {
+public Proposal proposeTeam(UUID gameId, UUID leaderId, List<UUID> proposedMemberIds) {
     Game game = gameRepository.findById(gameId)
         .orElseThrow(() -> new RuntimeException("游戏不存在"));
     
@@ -105,22 +137,20 @@ public Quest proposeTeam(UUID gameId, UUID leaderId, List<UUID> proposedMemberId
         throw new RuntimeException("不是当前队长");
     }
     
-    if (!currentQuest.getStatus().equals(QuestStatus.PROPOSING.getValue())) {
-        throw new RuntimeException("当前阶段不是队伍组建");
-    }
-    
     // 验证队伍成员
     if (proposedMemberIds.size() != currentQuest.getRequiredPlayers()) {
         throw new RuntimeException("队伍人数不符合要求");
     }
     
-    // 设置提议的队伍成员
+    // 创建新的Proposal实体
+    Proposal proposal = new Proposal();
+    proposal.setQuest(currentQuest);
+    proposal.setLeader(leader);
     List<User> proposedMembers = userRepository.findAllById(proposedMemberIds);
-    currentQuest.setProposedMembers(proposedMembers);
+    proposal.setProposedMembers(proposedMembers);
+    proposal.setCreatedAt(LocalDateTime.now());
     
-    // 更新任务状态为投票阶段
-    currentQuest.setStatus(QuestStatus.VOTING.getValue());
-    questRepository.save(currentQuest);
+    Proposal savedProposal = proposalRepository.save(proposal);
     
     // 发送WebSocket消息通知所有玩家开始投票
     GameMessage message = new GameMessage();
@@ -131,7 +161,7 @@ public Quest proposeTeam(UUID gameId, UUID leaderId, List<UUID> proposedMemberId
     
     messagingTemplate.convertAndSend("/topic/game/" + gameId, message);
     
-    return currentQuest;
+    return savedProposal;
 }
 ```
 
@@ -144,32 +174,26 @@ public Quest proposeTeam(UUID gameId, UUID leaderId, List<UUID> proposedMemberId
  * @param approve 是否赞成
  */
 @Transactional
-public Vote submitVote(UUID gameId, UUID playerId, boolean approve) {
+public Vote submitVote(UUID gameId, UUID proposalId, UUID playerId, boolean approve) {
     Game game = gameRepository.findById(gameId)
         .orElseThrow(() -> new RuntimeException("游戏不存在"));
     
-    GamePlayer player = gamePlayerRepository.findByGameAndUser(game, userRepository.findById(playerId).orElseThrow())
-        .orElseThrow(() -> new RuntimeException("玩家不在游戏中"));
+    Proposal proposal = proposalRepository.findById(proposalId)
+        .orElseThrow(() -> new RuntimeException("提议不存在"));
     
-    Quest currentQuest = getCurrentQuest(game);
-    if (currentQuest == null) {
-        throw new RuntimeException("没有当前任务");
-    }
+    User player = userRepository.findById(playerId)
+        .orElseThrow(() -> new RuntimeException("玩家不存在"));
     
-    if (!currentQuest.getStatus().equals(QuestStatus.VOTING.getValue())) {
-        throw new RuntimeException("当前阶段不是投票");
-    }
-    
-    // 检查是否已经投票
-    if (voteRepository.existsByQuestAndPlayer(currentQuest, player.getUser())) {
-        throw new RuntimeException("已经投过票了");
+    // 检查是否已经对该提议投票
+    if (voteRepository.existsByProposalAndPlayer(proposal, player)) {
+        throw new RuntimeException("已经对该提议投过票了");
     }
     
     // 创建投票记录
     Vote vote = new Vote();
-    vote.setQuest(currentQuest);
-    vote.setPlayer(player.getUser());
-    vote.setApprove(approve);
+    vote.setProposal(proposal);
+    vote.setPlayer(player);
+    vote.setVoteType(approve ? "APPROVE" : "REJECT");
     vote.setVotedAt(LocalDateTime.now());
     
     Vote savedVote = voteRepository.save(vote);
@@ -178,7 +202,7 @@ public Vote submitVote(UUID gameId, UUID playerId, boolean approve) {
     GameMessage message = new GameMessage();
     message.setType("VOTE_SUBMITTED");
     message.setGameId(gameId);
-    message.setContent(player.getUser().getUsername() + "已投票");
+    message.setContent(player.getUsername() + "已投票");
     message.setTimestamp(System.currentTimeMillis());
     
     messagingTemplate.convertAndSend("/topic/game/" + gameId, message);
@@ -192,23 +216,24 @@ public Vote submitVote(UUID gameId, UUID playerId, boolean approve) {
 /**
  * 处理投票结果
  * @param gameId 游戏ID
+ * @param proposalId 提议ID
  */
 @Transactional
-public void processVoteResults(UUID gameId) {
+public void processVoteResults(UUID gameId, UUID proposalId) {
     Game game = gameRepository.findById(gameId)
         .orElseThrow(() -> new RuntimeException("游戏不存在"));
     
-    Quest currentQuest = getCurrentQuest(game);
-    if (currentQuest == null) {
-        throw new RuntimeException("没有当前任务");
-    }
+    Proposal proposal = proposalRepository.findById(proposalId)
+        .orElseThrow(() -> new RuntimeException("提议不存在"));
     
-    List<Vote> votes = voteRepository.findByQuest(currentQuest);
+    Quest currentQuest = proposal.getQuest();
+    
+    List<Vote> votes = voteRepository.findByProposal(proposal);
     long approveCount = votes.stream()
-        .filter(Vote::isApprove)
+        .filter(vote -> "APPROVE".equals(vote.getVoteType()))
         .count();
     long rejectCount = votes.stream()
-        .filter(vote -> !vote.isApprove())
+        .filter(vote -> "REJECT".equals(vote.getVoteType()))
         .count();
     
     boolean votePassed = approveCount > rejectCount;
@@ -216,6 +241,10 @@ public void processVoteResults(UUID gameId) {
     if (votePassed) {
         // 投票通过，进入任务执行阶段
         currentQuest.setStatus(QuestStatus.EXECUTING.getValue());
+        
+        // 将通过的提议成员设置为任务成员（向后兼容）
+        currentQuest.setProposedMembers(proposal.getProposedMembers());
+        
         questRepository.save(currentQuest);
         
         // 发送WebSocket消息通知任务执行开始
@@ -250,7 +279,7 @@ public void processVoteResults(UUID gameId) {
 
 #### 队伍提议接口
 ```
-POST /api/games/{gameId}/propose-team
+POST /api/games/{gameId}/proposals
 ```
 
 请求体：
@@ -262,7 +291,7 @@ POST /api/games/{gameId}/propose-team
 
 #### 投票接口
 ```
-POST /api/games/{gameId}/vote
+POST /api/games/{gameId}/proposals/{proposalId}/votes
 ```
 
 请求体：
@@ -274,15 +303,16 @@ POST /api/games/{gameId}/vote
 
 #### 处理投票结果接口
 ```
-POST /api/games/{gameId}/process-votes
+POST /api/games/{gameId}/proposals/{proposalId}/process-votes
 ```
 
 ## 5. 实施计划
 
 ### 5.1 第一阶段：数据模型和实体类
-1. 创建Vote实体类
-2. 扩展Quest实体类
-3. 创建相应的Repository接口
+1. 创建Proposal实体类
+2. 修改Quest实体类，添加与Proposal的关联
+3. 修改Vote实体类，支持关联Proposal
+4. 创建相应的Repository接口
 
 ### 5.2 第二阶段：服务层实现
 1. 实现队伍提议方法

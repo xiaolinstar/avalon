@@ -243,6 +243,7 @@ public class Quest {
     private List<Vote> votes;              // 全体玩家投票记录（含赞成/反对）
     private List<QuestResult> executions; // 出征者匿名投的任务卡（success/fail）
     private QuestResult result;            // 最终成败（SUCCESS / FAIL / null）
+    private List<Proposal> proposals;      // 本轮任务的所有提议
 
     /**
      * 投票阶段结束调用：统计赞成/反对，达到半数以上赞成即通过
@@ -269,34 +270,40 @@ public class Quest {
 }
 ```
 
-### 5.2 设计模式应用
+**Proposal类（提议系统）**
 
-待办...
+职能：封装队长对任务队伍的提议，每个任务可能有多个提议（未通过的也会被记录）。
 
-**原型模式（Prototype Pattern）**
-用于角色创建和游戏配置，支持快速复制和定制化：
+* 保存提议者、提议成员、创建时间等信息
+* 与Quest关联，表示对特定任务的提议
+* 与Vote关联，收集玩家对该提议的投票
 
-* `RolePrototype`: 角色原型管理
+```java
+public class Proposal {
+    private UUID id;                    // 提议唯一标识
+    private Quest quest;                // 关联的任务
+    private User leader;                // 提议者
+    private List<User> proposedMembers; // 提议的成员
+    private LocalDateTime createdAt;    // 创建时间
+    private List<Vote> votes;           // 投票记录
 
-* `GameConfigPrototype`: 游戏配置原型
+    /**
+     * 获取投票结果：统计赞成/反对票数
+     * @return true 通过，false 否决
+     */
+    public boolean isApproved();
 
-**观察者模式（Observer Pattern）**
-用于游戏状态变更通知：
+    /**
+     * 获取赞成票数
+     */
+    public long getApproveCount();
 
-* `GameObserver`: 游戏状态观察者
-
-* `WebSocketPublisher`: 实时消息推送
-
-**策略模式（Strategy Pattern）**
-用于不同的胜利条件判断：
-
-* `VictoryConditionStrategy`: 胜利条件策略
-
-* `QuestVictoryStrategy`: 任务胜利策略
-
-* `AssassinationVictoryStrategy`: 刺杀胜利策略
-
-***
+    /**
+     * 获取反对票数
+     */
+    public long getRejectCount();
+}
+```
 
 ## 6. 面向对象建模
 
@@ -412,10 +419,22 @@ classDiagram
         --votePassed(): boolean
         --execute(List~QuestResult~)
     }
+    
+    class Proposal {
+        -UUID id
+        -UUID questId
+        -UUID leaderId
+        -LocalDateTime createdAt
+        --isApproved(): boolean
+        --getApproveCount(): long
+        --getRejectCount(): long
+    }
+    
     class Vote {
         -UUID id
         -UUID questId
         -UUID playerId
+        -UUID proposalId
         -VoteType voteType
     }
     class QuestResult {
@@ -431,6 +450,8 @@ classDiagram
     Game "1" -- "*" GamePlayer : contains
     User "1" -- "*" GamePlayer : plays
     Game "1" -- "*" Quest : has
+    Quest "1" -- "*" Proposal : contains
+    Proposal "1" -- "*" Vote : collects
     Quest "1" -- "*" Vote : contains
     Quest "1" -- "*" QuestResult : has
     GamePlayer "1" -- "1" RoleInfo : has
@@ -475,9 +496,9 @@ sequenceDiagram
   participant DB as PostgreSQL
   participant W as WebSocket
 
-  P->>C: POST /api/games/{gameId}/quests/{questNumber}/proposals
-  C->>S: createProposal(questNumber, members)
-  S->>Q: createProposal(questNumber, leader, members)
+  P->>C: POST /api/games/{gameId}/quests/{questId}/proposals
+  C->>S: createProposal(questId, members)
+  S->>Q: createProposal(questId, leader, members)
   Q->>DB: insert proposal
   S->>W:W->>S: broadcast /topic/games/{gameId} ProposalCreated
   W->>P: 显示投票按钮
@@ -492,7 +513,7 @@ sequenceDiagram
   S->>Q: startQuestExecution()
   Q->>W: private /topic/games/{gameId}/quest/execution 给出征者发执行页
   loop 出征者
-    P->>C: POST /api/games/{gameId}/quests/{questNumber}/execution
+    P->>C: POST /api/games/{gameId}/quests/{questId}/execution
     C->>S: submitQuestExecution(playerId, success)
     S->>DB: insert quest_execution(encrypted)
   end

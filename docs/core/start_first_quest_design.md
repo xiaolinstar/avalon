@@ -42,7 +42,7 @@ graph TD
 ## 4. 接口设计
 
 ### 4.1 REST API
-- **Endpoint**: `POST /api/games/{gameId}/start-first-quest`
+- **Endpoint**: `POST /api/games/{gameId}/quest?isFirstQuest=true`
 - **Method**: POST
 - **权限**: 仅房主可调用
 - **请求参数**: 
@@ -58,8 +58,8 @@ graph TD
 
 ### 4.2 WebSocket通知
 - **Topic**: `/topic/game/{gameId}`
-- **消息类型**: `FIRST_QUEST_STARTED`
-- **内容**: "第一个任务已开始"
+- **消息类型**: `QUEST_STARTED`
+- **内容**: "任务已开始"
 
 ## 5. 数据模型变更
 

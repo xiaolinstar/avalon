@@ -4,6 +4,7 @@ import cn.xiaolin.avalon.dto.*;
 import cn.xiaolin.avalon.entity.User;
 import cn.xiaolin.avalon.repository.*;
 import cn.xiaolin.avalon.utils.JwtUtil;
+import cn.xiaolin.avalon.websocket.GameMessage;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 import org.junit.jupiter.api.AfterEach;
@@ -778,12 +779,18 @@ class GameControllerTest {
                         .content(objectMapper.writeValueAsString(proposeRequest)))
                 .andExpect(status().isOk());
         
-        // 所有玩家投票同意
-        for (PlayerInfoResponse player : players) {
+        // 确保大部分玩家投票赞成（确保赞成票数大于反对票数）
+        // 对于5个玩家，需要至少3个赞成票才能通过（3 > 2）
+        int totalPlayers = players.size();
+        int approveCount = totalPlayers / 2 + 1; // 超过一半的玩家投赞成票
+        
+        // 让前approveCount个玩家投赞成票
+        for (int i = 0; i < approveCount; i++) {
+            PlayerInfoResponse player = players.get(i);
             String voterToken = "Bearer " + jwtUtil.generateToken(player.getPlayerId(), player.getUsername());
             
             VoteRequest voteRequest = new VoteRequest();
-            voteRequest.setVoteType("APPROVE");
+            voteRequest.setVoteType("approve");
             
             mockMvc.perform(post("/api/games/{gameId}/vote", gameId)
                             .header("Authorization", voterToken)
@@ -792,9 +799,29 @@ class GameControllerTest {
                     .andExpect(status().isOk());
         }
         
-        // 验证WebSocket消息已发送
+        // 让剩余玩家投反对票
+        for (int i = approveCount; i < totalPlayers; i++) {
+            PlayerInfoResponse player = players.get(i);
+            String voterToken = "Bearer " + jwtUtil.generateToken(player.getPlayerId(), player.getUsername());
+            
+            VoteRequest voteRequest = new VoteRequest();
+            voteRequest.setVoteType("reject");
+            
+            mockMvc.perform(post("/api/games/{gameId}/vote", gameId)
+                            .header("Authorization", voterToken)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(voteRequest)))
+                    .andExpect(status().isOk());
+        }
+        
+        // 验证WebSocket消息已发送 - 包括投票提交消息和最终结果消息
         verify(messagingTemplate, atLeastOnce())
                 .convertAndSend(anyString(), any(Object.class));
+        
+        // 验证发送了TEAM_APPROVED消息（在最后一个玩家投票后应该触发）
+        verify(messagingTemplate, atLeastOnce())
+                .convertAndSend(eq("/topic/game/" + gameId), (Object) argThat(argument -> 
+                    argument instanceof GameMessage && "TEAM_APPROVED".equals(((GameMessage) argument).getType())));
     }
     
     /**
@@ -859,27 +886,48 @@ class GameControllerTest {
                         .content(objectMapper.writeValueAsString(proposeRequest)))
                 .andExpect(status().isOk());
         
-        // 大部分玩家投票反对
-        int rejectCount = players.size() / 2 + 1; // 超过一半的玩家
-        int i = 0;
-        for (PlayerInfoResponse player : players) {
-            if (i >= rejectCount) break;
-            
+        // 确保大部分玩家投票反对（确保反对票数大于赞成票数）
+        // 对于5个玩家，需要至少3个反对票才能失败（3 > 2）
+        int totalPlayers = players.size();
+        int rejectCount = totalPlayers / 2 + 1; // 超过一半的玩家投反对票
+        
+        // 让前rejectCount个玩家投反对票
+        for (int i = 0; i < rejectCount; i++) {
+            PlayerInfoResponse player = players.get(i);
             String voterToken = "Bearer " + jwtUtil.generateToken(player.getPlayerId(), player.getUsername());
             
             VoteRequest voteRequest = new VoteRequest();
-            voteRequest.setVoteType("REJECT");
+            voteRequest.setVoteType("reject");
             
             mockMvc.perform(post("/api/games/{gameId}/vote", gameId)
                             .header("Authorization", voterToken)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(voteRequest)))
                     .andExpect(status().isOk());
-            i++;
+        }
+        
+        // 让剩余玩家投赞成票
+        for (int i = rejectCount; i < totalPlayers; i++) {
+            PlayerInfoResponse player = players.get(i);
+            String voterToken = "Bearer " + jwtUtil.generateToken(player.getPlayerId(), player.getUsername());
+            
+            VoteRequest voteRequest = new VoteRequest();
+            voteRequest.setVoteType("approve");
+            
+            mockMvc.perform(post("/api/games/{gameId}/vote", gameId)
+                            .header("Authorization", voterToken)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(voteRequest)))
+                    .andExpect(status().isOk());
         }
         
         // 验证WebSocket消息已发送
         verify(messagingTemplate, atLeastOnce())
                 .convertAndSend(anyString(), any(Object.class));
+        
+        // 验证发送了TEAM_REJECTED消息（在最后一个玩家投票后应该触发）
+        verify(messagingTemplate, atLeastOnce())
+                .convertAndSend(eq("/topic/game/" + gameId), (Object) argThat(argument -> 
+                    argument instanceof GameMessage && "TEAM_REJECTED".equals(((GameMessage) argument).getType())));
     }
 }

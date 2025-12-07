@@ -121,53 +121,6 @@ public class GameService {
     }
 
     /**
-     * 开始第一个任务，当所有玩家都查看完角色后调用
-     * 注意：这是为了保持向后兼容性而保留的方法，实际任务启动应使用统一的startQuest方法
-     */
-    @Transactional
-    public void startFirstQuest(UUID gameId) {
-        Game game = gameRepository.findById(gameId)
-            .orElseThrow(() -> new RuntimeException("游戏不存在"));
-
-        // 确保游戏处于正确的状态
-        if (!Objects.equals(game.getStatus(), GameStatus.ROLE_VIEWING.getValue())) {
-            throw new RuntimeException("游戏状态不正确，无法开始第一个任务");
-        }
-
-        // 获取玩家数量
-        List<GamePlayer> gamePlayers = gamePlayerRepository.findByGame(game);
-        int playerCount = gamePlayers.size();
-
-        // 创建任务
-        createQuests(game, playerCount);
-
-        // 更新游戏状态为PLAYING，表示游戏正式开始
-        game.setStatus(GameStatus.PLAYING.getValue());
-        gameRepository.save(game);
-
-        // 获取第一个任务
-        Quest firstQuest = questRepository.findByGameOrderByRoundNumber(game).get(0);
-        if (firstQuest == null) {
-            throw new RuntimeException("没有找到第一个任务");
-        }
-
-        // 确保第一个任务的队长已设置
-        if (Objects.isNull(firstQuest.getLeader()) && !gamePlayers.isEmpty()) {
-            firstQuest.setLeader(gamePlayers.get(0).getUser());
-            questRepository.save(firstQuest);
-        }
-
-        // 发送WebSocket消息通知所有玩家第一个任务已开始
-        GameMessage message = new GameMessage();
-        message.setType("FIRST_QUEST_STARTED");
-        message.setGameId(gameId);
-        message.setContent("第一个任务已开始");
-        message.setTimestamp(System.currentTimeMillis());
-
-        messagingTemplate.convertAndSend("/topic/game/" + gameId, message);
-    }
-
-    /**
      * 统一的任务启动方法
      * @param gameId 游戏ID
      * @param isFirstQuest 是否为第一个任务
@@ -400,7 +353,27 @@ public class GameService {
         vote.setPlayer(player.getUser());
         vote.setVoteType(request.getVoteType());
     
-        return voteRepository.save(vote);
+        Vote savedVote = voteRepository.save(vote);
+        
+        // 检查是否所有玩家都已投票，如果是则处理投票结果
+        List<GamePlayer> gamePlayers = gamePlayerRepository.findByGame(game);
+        List<Vote> votes = voteRepository.findByQuest(currentQuest);
+        
+        // 如果所有玩家都已投票，则处理投票结果
+        if (votes.size() == gamePlayers.size()) {
+            processVoteResults(gameId);
+        } else {
+            // 发送WebSocket消息通知投票情况
+            GameMessage message = new GameMessage();
+            message.setType("VOTE_SUBMITTED");
+            message.setGameId(gameId);
+            message.setContent(player.getUser().getUsername() + "已投票");
+            message.setTimestamp(System.currentTimeMillis());
+            
+            messagingTemplate.convertAndSend("/topic/game/" + gameId, message);
+        }
+    
+        return savedVote;
     }
 
     @Transactional
@@ -409,7 +382,7 @@ public class GameService {
             .orElseThrow(() -> new RuntimeException("游戏不存在"));
         
         Quest currentQuest = getCurrentQuest(game);
-        if (currentQuest == null) {
+        if (Objects.isNull(currentQuest)) {
             throw new RuntimeException("没有当前任务");
         }
         
