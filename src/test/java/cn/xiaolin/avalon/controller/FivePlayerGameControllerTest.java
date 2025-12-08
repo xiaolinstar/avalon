@@ -122,7 +122,7 @@ class FivePlayerGameControllerTest {
         roomId = roomResponse.getRoomId().toString();
 
         for(int i=1; i<5; i++) {
-            mockMvc.perform(post("/api/rooms/{roomCode}", roomCode)
+            mockMvc.perform(post("/api/rooms/{roomId}", roomId)
                         .header("Authorization", playerTokens.get(i)))
                     .andExpect(status().isOk());
         }
@@ -153,7 +153,7 @@ class FivePlayerGameControllerTest {
                 .andExpect(status().isOk());
 
         // 获取实际的游戏ID
-        String roomResponseStr = mockMvc.perform(get("/api/rooms/{roomCode}", roomCode)
+        String roomResponseStr = mockMvc.perform(get("/api/rooms/{roomId}", roomId)
                 .header("Authorization", authorizationHeader))
                 .andExpect(status().isOk())
                 .andReturn()
@@ -172,7 +172,7 @@ class FivePlayerGameControllerTest {
                 .andExpect(status().isOk());
 
         // 获取房间中的所有玩家ID
-        String playersResponseStr = mockMvc.perform(get("/api/rooms/{roomCode}/players", roomCode)
+        String playersResponseStr = mockMvc.perform(get("/api/rooms/{roomId}/players", roomId)
                 .header("Authorization", authorizationHeader))
                 .andExpect(status().isOk())
                 .andReturn()
@@ -299,7 +299,7 @@ class FivePlayerGameControllerTest {
                 .andExpect(status().isOk());
 
         // 获取实际的游戏ID
-        String roomResponseStr = mockMvc.perform(get("/api/rooms/{roomCode}", roomCode)
+        String roomResponseStr = mockMvc.perform(get("/api/rooms/{roomId}", roomId)
                 .header("Authorization", authorizationHeader))
                 .andExpect(status().isOk())
                 .andReturn()
@@ -318,7 +318,7 @@ class FivePlayerGameControllerTest {
                 .andExpect(status().isOk());
 
         // 获取房间中的所有玩家ID
-        String playersResponseStr = mockMvc.perform(get("/api/rooms/{roomCode}/players", roomCode)
+        String playersResponseStr = mockMvc.perform(get("/api/rooms/{roomId}/players", roomId)
                 .header("Authorization", authorizationHeader))
                 .andExpect(status().isOk())
                 .andReturn()
@@ -498,7 +498,7 @@ class FivePlayerGameControllerTest {
                 .andExpect(status().isOk());
 
         // 获取实际的游戏ID
-        String roomResponseStr = mockMvc.perform(get("/api/rooms/{roomCode}", roomCode)
+        String roomResponseStr = mockMvc.perform(get("/api/rooms/{roomId}", roomId)
                 .header("Authorization", authorizationHeader))
                 .andExpect(status().isOk())
                 .andReturn()
@@ -517,7 +517,7 @@ class FivePlayerGameControllerTest {
                 .andExpect(status().isOk());
 
         // 获取房间中的所有玩家ID
-        String playersResponseStr = mockMvc.perform(get("/api/rooms/{roomCode}/players", roomCode)
+        String playersResponseStr = mockMvc.perform(get("/api/rooms/{roomId}/players", roomId)
                 .header("Authorization", authorizationHeader))
                 .andExpect(status().isOk())
                 .andReturn()
@@ -644,7 +644,7 @@ class FivePlayerGameControllerTest {
                 .andExpect(status().isOk());
 
         // 获取实际的游戏ID
-        String roomResponseStr = mockMvc.perform(get("/api/rooms/{roomCode}", roomCode)
+        String roomResponseStr = mockMvc.perform(get("/api/rooms/{roomId}", roomId)
                 .header("Authorization", authorizationHeader))
                 .andExpect(status().isOk())
                 .andReturn()
@@ -663,7 +663,7 @@ class FivePlayerGameControllerTest {
                 .andExpect(status().isOk());
 
         // 获取房间中的所有玩家ID
-        String playersResponseStr = mockMvc.perform(get("/api/rooms/{roomCode}/players", roomCode)
+        String playersResponseStr = mockMvc.perform(get("/api/rooms/{roomId}/players", roomId)
                 .header("Authorization", authorizationHeader))
                 .andExpect(status().isOk())
                 .andReturn()
@@ -789,7 +789,7 @@ class FivePlayerGameControllerTest {
                 .andExpect(status().isOk());
 
         // 获取实际的游戏ID
-        String roomResponseStr = mockMvc.perform(get("/api/rooms/{roomCode}", roomCode)
+        String roomResponseStr = mockMvc.perform(get("/api/rooms/{roomId}", roomId)
                 .header("Authorization", authorizationHeader))
                 .andExpect(status().isOk())
                 .andReturn()
@@ -808,7 +808,7 @@ class FivePlayerGameControllerTest {
                 .andExpect(status().isOk());
 
         // 获取房间中的所有玩家ID
-        String playersResponseStr = mockMvc.perform(get("/api/rooms/{roomCode}/players", roomCode)
+        String playersResponseStr = mockMvc.perform(get("/api/rooms/{roomId}/players", roomId)
                 .header("Authorization", authorizationHeader))
                 .andExpect(status().isOk())
                 .andReturn()

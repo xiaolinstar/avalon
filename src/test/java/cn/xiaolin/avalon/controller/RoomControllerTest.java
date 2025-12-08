@@ -32,6 +32,10 @@ import static org.mockito.Mockito.*;
 
 // 添加RoomEvent导入
 import cn.xiaolin.avalon.websocket.RoomEvent;
+import cn.xiaolin.avalon.websocket.RoomEventController;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -63,7 +67,7 @@ class RoomControllerTest {
     private JwtUtil jwtUtil;
 
     @MockitoBean
-    private SimpMessagingTemplate messagingTemplate;
+    private RoomEventController roomEventController;
 
     private User testUser;
     private String authorizationHeader;
@@ -160,7 +164,8 @@ class RoomControllerTest {
         
         // 验证没有发送WebSocket消息（创建房间时不发送WebSocket消息）
         // 根据当前实现，创建房间不会发送WebSocket消息，只在加入和离开房间时发送
-        verify(messagingTemplate, never()).convertAndSend(anyString(), any(RoomEvent.class));
+        verify(roomEventController, never()).broadcastRoomEvent(anyString(), anyString(), anyString(), anyString());
+        verify(roomEventController, never()).broadcastRoomEventWithData(anyString(), anyString(), anyMap());
     }
 
     /**
@@ -212,8 +217,7 @@ class RoomControllerTest {
                 .andExpect(jsonPath("$.data.currentPlayers").value(2));
         
         // 验证WebSocket消息已发送
-        verify(messagingTemplate, atLeastOnce())
-                .convertAndSend(eq("/topic/room/" + roomId), any(RoomEvent.class));
+        verify(roomEventController, atLeastOnce()).broadcastRoomEvent(anyString(), anyString(), anyString(), anyString());
     }
 
     /**
@@ -594,8 +598,7 @@ class RoomControllerTest {
                 .andExpect(jsonPath("$.message").value("离开房间成功"));
         
         // 验证WebSocket消息已发送
-        verify(messagingTemplate, atLeastOnce())
-                .convertAndSend(eq("/topic/room/" + roomId), any(RoomEvent.class));
+        verify(roomEventController, atLeastOnce()).broadcastRoomEventWithData(anyString(), anyString(), anyMap());
     }
 
     /**
@@ -648,8 +651,7 @@ class RoomControllerTest {
                 .andExpect(jsonPath("$.message").value("离开房间成功"));
         
         // 验证WebSocket消息已发送
-        verify(messagingTemplate, atLeastOnce())
-                .convertAndSend(eq("/topic/room/" + roomId), any(RoomEvent.class));
+        verify(roomEventController, atLeastOnce()).broadcastRoomEventWithData(anyString(), anyString(), anyMap());
     }
 
     /**
