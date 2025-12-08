@@ -1,17 +1,12 @@
 package cn.xiaolin.avalon.controller;
 
 import cn.xiaolin.avalon.dto.Result;
-import cn.xiaolin.avalon.dto.ProposeTeamRequest;
-import cn.xiaolin.avalon.dto.ExecuteQuestRequest;
-import cn.xiaolin.avalon.dto.VoteRequest;
 import cn.xiaolin.avalon.dto.AssassinationRequest;
 import cn.xiaolin.avalon.dto.GameStateResponse;
 import cn.xiaolin.avalon.dto.RoleInfoResponse;
 import cn.xiaolin.avalon.dto.GameStatisticsResponse;
 import cn.xiaolin.avalon.entity.Game;
 import cn.xiaolin.avalon.entity.GamePlayer;
-import cn.xiaolin.avalon.entity.Quest;
-import cn.xiaolin.avalon.entity.Vote;
 import cn.xiaolin.avalon.service.GameService;
 import cn.xiaolin.avalon.service.GameStateService;
 import cn.xiaolin.avalon.service.AssassinationService;
@@ -66,40 +61,6 @@ public class GameController {
         }
     }
 
-    /**
-     * 开始任务接口
-     * @param gameId 游戏ID
-     * @param isFirstQuest 是否为第一个任务（可选参数）
-     * @return 启动结果
-     */
-    @PostMapping("/{gameId}/quests")
-    @Operation(summary = "开始任务", description = "开始一个新的任务")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "任务开始成功",
-                    content = {@Content(mediaType = "application/json",
-                            schema = @Schema(implementation = Result.class))}),
-            @ApiResponse(responseCode = "400", description = "任务开始失败",
-                    content = {@Content(mediaType = "application/json",
-                            schema = @Schema(implementation = Result.class))})
-    })
-    public ResponseEntity<Result<Void>> startQuest(
-            @Parameter(description = "游戏ID", required = true)
-            @PathVariable UUID gameId,
-            @Parameter(description = "是否为第一个任务")
-            @RequestParam(required = false, defaultValue = "false") boolean isFirstQuest) {
-        try {
-            gameService.startQuest(gameId, isFirstQuest);
-            
-            if (isFirstQuest) {
-                return ResponseEntity.ok(Result.success("第一个任务开始成功", null));
-            } else {
-                return ResponseEntity.ok(Result.success("任务开始成功", null));
-            }
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Result.error(e.getMessage()));
-        }
-    }
-
     @GetMapping("/{gameId}")
     @Operation(summary = "获取游戏信息", description = "获取指定游戏的完整信息，体现资源状态转移的理念")
     @ApiResponses(value = {
@@ -137,27 +98,6 @@ public class GameController {
         try {
             List<GamePlayer> players = gameService.getGamePlayers(gameId);
             return ResponseEntity.ok(Result.success("获取游戏参与者成功", players));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Result.error(e.getMessage()));
-        }
-    }
-
-    @GetMapping("/{gameId}/quests")
-    @Operation(summary = "获取游戏任务列表", description = "获取指定游戏的所有任务信息")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "获取游戏任务列表成功",
-                    content = {@Content(mediaType = "application/json",
-                            schema = @Schema(implementation = Result.class))}),
-            @ApiResponse(responseCode = "400", description = "获取游戏任务列表失败",
-                    content = {@Content(mediaType = "application/json",
-                            schema = @Schema(implementation = Result.class))})
-    })
-    public ResponseEntity<Result<List<Quest>>> getGameQuests(
-            @Parameter(description = "游戏ID", required = true)
-            @PathVariable UUID gameId) {
-        try {
-            List<Quest> quests = gameService.getGameQuests(gameId);
-            return ResponseEntity.ok(Result.success("获取游戏任务列表成功", quests));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Result.error(e.getMessage()));
         }
@@ -210,96 +150,6 @@ public class GameController {
 
             RoleInfoResponse roleInfo = gameStateService.getRoleInfo(gameId, userId);
             return ResponseEntity.ok(Result.success("操作成功", roleInfo));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Result.error(e.getMessage()));
-        }
-    }
-
-    @PostMapping("/{gameId}/propose-team")
-    @Operation(summary = "提议队伍", description = "当前队长为当前任务提议执行队伍")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "队伍提议成功",
-                    content = {@Content(mediaType = "application/json",
-                            schema = @Schema(implementation = Result.class))}),
-            @ApiResponse(responseCode = "400", description = "队伍提议失败",
-                    content = {@Content(mediaType = "application/json",
-                            schema = @Schema(implementation = Result.class))})
-    })
-    public ResponseEntity<Result<Quest>> proposeTeam(
-            @Parameter(description = "游戏ID", required = true)
-            @PathVariable UUID gameId,
-            @Parameter(description = "JWT Token", required = true)
-            @RequestHeader("Authorization") String authorizationHeader,
-            @Valid @RequestBody ProposeTeamRequest request) {
-        try {
-            String token = authorizationHeader.substring(7);
-            UUID userId = jwtUtil.getUserIdFromToken(token);
-
-            Quest quest = gameService.proposeTeam(gameId, userId, request);
-            return ResponseEntity.ok(Result.success("队伍提议成功", quest));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Result.error(e.getMessage()));
-        }
-    }
-
-    @PostMapping("/{gameId}/vote")
-    @Operation(summary = "提交投票", description = "玩家对当前提议的队伍进行投票")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "投票成功",
-                    content = {@Content(mediaType = "application/json",
-                            schema = @Schema(implementation = Result.class))}),
-            @ApiResponse(responseCode = "400", description = "投票失败",
-                    content = {@Content(mediaType = "application/json",
-                            schema = @Schema(implementation = Result.class))})
-    })
-    public ResponseEntity<Result<Vote>> submitVote(
-            @Parameter(description = "游戏ID", required = true)
-            @PathVariable UUID gameId,
-            @Parameter(description = "JWT Token", required = true)
-            @RequestHeader("Authorization") String authorizationHeader,
-            @Valid @RequestBody VoteRequest request) {
-        try {
-            String token = authorizationHeader.substring(7);
-            UUID userId = jwtUtil.getUserIdFromToken(token);
-
-            Vote vote = gameService.submitVote(gameId, userId, request);
-            return ResponseEntity.ok(Result.success("投票成功", vote));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Result.error(e.getMessage()));
-        }
-    }
-
-    /**
-     * 执行任务接口
-     * @param gameId 游戏ID
-     * @param round 回合数
-     * @param authorizationHeader 授权头
-     * @param request 请求体
-     * @return 执行结果
-     */
-    @PostMapping("/{gameId}/quests/execute")
-    @Operation(summary = "执行任务", description = "当前任务的参与者执行任务")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "任务执行成功",
-                    content = {@Content(mediaType = "application/json",
-                            schema = @Schema(implementation = Result.class))}),
-            @ApiResponse(responseCode = "400", description = "任务执行失败",
-                    content = {@Content(mediaType = "application/json",
-                            schema = @Schema(implementation = Result.class))})
-    })
-    public ResponseEntity<Result<Void>> executeQuest(
-            @Parameter(description = "游戏ID", required = true)
-            @PathVariable UUID gameId,
-//            @RequestParam Integer round,
-            @Parameter(description = "JWT Token", required = true)
-            @RequestHeader("Authorization") String authorizationHeader,
-            @Valid @RequestBody ExecuteQuestRequest request) {
-        try {
-            String token = authorizationHeader.substring(7);
-            UUID userId = jwtUtil.getUserIdFromToken(token);
-
-            gameService.executeQuest(gameId, userId, request);
-            return ResponseEntity.ok(Result.success("任务执行成功", null));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Result.error(e.getMessage()));
         }

@@ -163,7 +163,8 @@ class SixPlayerGameControllerTest {
         String gameId = roomResponse.getGameId().toString();
 
         // 开始第一个任务
-        mockMvc.perform(post("/api/games/{gameId}/quests?isFirstQuest=true", gameId)
+        mockMvc.perform(post("/api/games/{gameId}/quests", gameId)
+                        .param("isFirstQuest", "true")
                         .header("Authorization", authorizationHeader))
                 .andExpect(status().isOk());
 
@@ -225,7 +226,7 @@ class SixPlayerGameControllerTest {
             proposeRequest.setPlayerIds(selectedPlayerIds);
 
             // 队长提议队伍
-            mockMvc.perform(post("/api/games/{gameId}/propose-team", gameId)
+            mockMvc.perform(post("/api/games/{gameId}/proposals", gameId)
                             .header("Authorization", leaderToken)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(proposeRequest)))
@@ -238,7 +239,7 @@ class SixPlayerGameControllerTest {
                 VoteRequest voteRequest = new VoteRequest();
                 voteRequest.setVoteType("approve");
 
-                mockMvc.perform(post("/api/games/{gameId}/vote", gameId)
+                mockMvc.perform(post("/api/games/{gameId}/votes", gameId)
                                 .header("Authorization", voterToken)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(voteRequest)))
@@ -305,7 +306,8 @@ class SixPlayerGameControllerTest {
         String gameId = roomResponse.getGameId().toString();
 
         // 开始第一个任务
-        mockMvc.perform(post("/api/games/{gameId}/quests?isFirstQuest=true", gameId)
+        mockMvc.perform(post("/api/games/{gameId}/quests", gameId)
+                        .param("isFirstQuest", "true")
                         .header("Authorization", authorizationHeader))
                 .andExpect(status().isOk());
 
@@ -367,7 +369,7 @@ class SixPlayerGameControllerTest {
             proposeRequest.setPlayerIds(selectedPlayerIds);
 
             // 队长提议队伍
-            mockMvc.perform(post("/api/games/{gameId}/propose-team", gameId)
+            mockMvc.perform(post("/api/games/{gameId}/proposals", gameId)
                             .header("Authorization", leaderToken)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(proposeRequest)))
@@ -380,7 +382,7 @@ class SixPlayerGameControllerTest {
                 VoteRequest voteRequest = new VoteRequest();
                 voteRequest.setVoteType("approve");
 
-                mockMvc.perform(post("/api/games/{gameId}/vote", gameId)
+                mockMvc.perform(post("/api/games/{gameId}/votes", gameId)
                                 .header("Authorization", voterToken)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(voteRequest)))
@@ -453,7 +455,8 @@ class SixPlayerGameControllerTest {
         String gameId = roomResponse.getGameId().toString();
 
         // 开始第一个任务
-        mockMvc.perform(post("/api/games/{gameId}/quests?isFirstQuest=true", gameId)
+        mockMvc.perform(post("/api/games/{gameId}/quests", gameId)
+                        .param("isFirstQuest", "true")
                         .header("Authorization", authorizationHeader))
                 .andExpect(status().isOk());
 
@@ -515,7 +518,7 @@ class SixPlayerGameControllerTest {
             proposeRequest.setPlayerIds(selectedPlayerIds);
 
             // 队长提议队伍
-            mockMvc.perform(post("/api/games/{gameId}/propose-team", gameId)
+            mockMvc.perform(post("/api/games/{gameId}/proposals", gameId)
                             .header("Authorization", leaderToken)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(proposeRequest)))
@@ -528,7 +531,7 @@ class SixPlayerGameControllerTest {
                 VoteRequest voteRequest = new VoteRequest();
                 voteRequest.setVoteType("approve");
 
-                mockMvc.perform(post("/api/games/{gameId}/vote", gameId)
+                mockMvc.perform(post("/api/games/{gameId}/votes", gameId)
                                 .header("Authorization", voterToken)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(voteRequest)))
@@ -601,7 +604,8 @@ class SixPlayerGameControllerTest {
         String gameId = roomResponse.getGameId().toString();
 
         // 开始第一个任务
-        mockMvc.perform(post("/api/games/{gameId}/quests?isFirstQuest=true", gameId)
+        mockMvc.perform(post("/api/games/{gameId}/quests", gameId)
+                        .param("isFirstQuest", "true")
                         .header("Authorization", authorizationHeader))
                 .andExpect(status().isOk());
 
@@ -660,7 +664,7 @@ class SixPlayerGameControllerTest {
         proposeRequest.setPlayerIds(selectedPlayerIds);
 
         // 队长提议队伍
-        mockMvc.perform(post("/api/games/{gameId}/propose-team", gameId)
+        mockMvc.perform(post("/api/games/{gameId}/proposals", gameId)
                         .header("Authorization", leaderToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(proposeRequest)))
@@ -678,7 +682,7 @@ class SixPlayerGameControllerTest {
             VoteRequest voteRequest = new VoteRequest();
             voteRequest.setVoteType("reject");
 
-            mockMvc.perform(post("/api/games/{gameId}/vote", gameId)
+            mockMvc.perform(post("/api/games/{gameId}/votes", gameId)
                             .header("Authorization", voterToken)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(voteRequest)))
