@@ -75,6 +75,7 @@ public class RoomService {
         );
     }
 
+    @Cacheable(value = "room", key = "#roomCode", unless = "#result == null")
     public RoomResponse getRoomByCode(String roomCode) {
         // 优化查询：使用JOIN FETCH预加载creator，避免N+1问题
         Room room = roomRepository.findByRoomCodeWithCreator(roomCode)

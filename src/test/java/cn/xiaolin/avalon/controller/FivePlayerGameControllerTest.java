@@ -78,14 +78,13 @@ class FivePlayerGameControllerTest {
     private SimpMessagingTemplate messagingTemplate;
 
     private String authorizationHeader;
-    private List<String> playerTokens;
 
     private String roomCode;
     private String roomId;
 
     @BeforeEach
     void setUp() throws Exception {
-        playerTokens = new ArrayList<>();
+        List<String> playerTokens = new ArrayList<>();
         // 添加足够的玩家到房间（至少5个用于游戏开始）
         for (int i = 0; i < 5; i++) {
             // 创建测试用户

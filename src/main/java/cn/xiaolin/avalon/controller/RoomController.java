@@ -60,8 +60,8 @@ public class RoomController {
         }
     }
 
-    @GetMapping("/{roomCode}")
-    @Operation(summary = "获取房间信息", description = "根据房间代码获取房间详细信息")
+    @GetMapping("/{roomId}")
+    @Operation(summary = "获取房间信息", description = "根据房间ID获取房间详细信息")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "获取房间信息成功",
                     content = {@Content(mediaType = "application/json",
@@ -71,18 +71,18 @@ public class RoomController {
                             schema = @Schema(implementation = Result.class))})
     })
     public ResponseEntity<Result<RoomResponse>> getRoom(
-            @Parameter(description = "房间代码", required = true)
-            @PathVariable String roomCode) {
+            @Parameter(description = "房间ID", required = true)
+            @PathVariable UUID roomId) {
         try {
-            RoomResponse roomResponse = roomService.getRoomByCode(roomCode);
+            RoomResponse roomResponse = roomService.getRoomById(roomId);
             return ResponseEntity.ok(Result.success("获取房间信息成功", roomResponse));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Result.error(e.getMessage()));
         }
     }
-
-    @GetMapping("/id/{roomId}")
-    @Operation(summary = "根据ID获取房间信息", description = "根据房间UUID获取房间详细信息")
+    
+    @GetMapping
+    @Operation(summary = "根据房间代码获取房间信息", description = "根据房间代码获取房间详细信息")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "获取房间信息成功",
                     content = {@Content(mediaType = "application/json",
@@ -91,21 +91,18 @@ public class RoomController {
                     content = {@Content(mediaType = "application/json",
                             schema = @Schema(implementation = Result.class))})
     })
-    public ResponseEntity<Result<RoomResponse>> getRoomById(
-            @Parameter(description = "房间ID", required = true)
-            @PathVariable String roomId) {
+    public ResponseEntity<Result<RoomResponse>> getRoomByCode(
+            @Parameter(description = "房间代码", required = true)
+            @RequestParam String roomCode) {
         try {
-            UUID roomUuid = UUID.fromString(roomId);
-            RoomResponse roomResponse = roomService.getRoomById(roomUuid);
+            RoomResponse roomResponse = roomService.getRoomByCode(roomCode);
             return ResponseEntity.ok(Result.success("获取房间信息成功", roomResponse));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Result.error("房间ID格式错误"));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Result.error(e.getMessage()));
         }
     }
 
-    @GetMapping("/{roomCode}/players")
+    @GetMapping("/{roomId}/players")
     @Operation(summary = "获取房间玩家列表", description = "获取指定房间内的所有玩家信息")
     @ApiResponses(value = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "获取房间玩家列表成功",
@@ -116,9 +113,13 @@ public class RoomController {
                             schema = @Schema(implementation = Result.class))})
     })
     public ResponseEntity<Result<RoomPlayersResponse>> getRoomPlayers(
-            @Parameter(description = "房间代码", required = true)
-            @PathVariable String roomCode) {
+            @Parameter(description = "房间ID", required = true)
+            @PathVariable UUID roomId) {
         try {
+            // 首先通过roomId获取房间，然后获取roomCode
+            RoomResponse room = roomService.getRoomById(roomId);
+            String roomCode = room.getRoomCode();
+            
             RoomPlayersResponse playersResponse = roomService.getRoomPlayers(roomCode);
             return ResponseEntity.ok(Result.success("获取房间玩家列表成功", playersResponse));
         } catch (Exception e) {
@@ -126,7 +127,7 @@ public class RoomController {
         }
     }
 
-    @PostMapping("/{roomCode}")
+    @PostMapping("/{roomId}")
     @Operation(summary = "加入房间", description = "用户加入指定的游戏房间")
     @ApiResponses(value = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "加入房间成功",
@@ -139,14 +140,16 @@ public class RoomController {
     public ResponseEntity<Result<RoomResponse>> joinRoom(
             @Parameter(description = "JWT Token", required = true)
             @RequestHeader("Authorization") String authorizationHeader,
-            @Parameter(description = "房间代码", required = true)
-            @PathVariable String roomCode) {
+            @Parameter(description = "房间ID", required = true)
+            @PathVariable UUID roomId) {
         try {
             String token = authorizationHeader.substring(7);
             UUID userId = jwtUtil.getUserIdFromToken(token);
 
+            // 通过roomId获取房间，然后构造JoinRoomRequest
+            RoomResponse room = roomService.getRoomById(roomId);
             JoinRoomRequest request = new JoinRoomRequest();
-            request.setRoomCode(roomCode);
+            request.setRoomCode(room.getRoomCode());
 
             RoomResponse roomResponse = roomService.joinRoom(userId, request);
 
@@ -167,7 +170,7 @@ public class RoomController {
         }
     }
 
-    @DeleteMapping("/{roomCode}")
+    @DeleteMapping("/{roomId}")
     @Operation(summary = "离开房间", description = "用户离开指定的游戏房间")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "离开房间成功",
@@ -180,16 +183,16 @@ public class RoomController {
     public ResponseEntity<Result<Void>> leaveRoom(
             @Parameter(description = "JWT Token", required = true)
             @RequestHeader("Authorization") String authorizationHeader,
-            @Parameter(description = "房间代码", required = true)
-            @PathVariable String roomCode) {
+            @Parameter(description = "房间ID", required = true)
+            @PathVariable UUID roomId) {
         try {
             String token = authorizationHeader.substring(7);
             UUID userId = jwtUtil.getUserIdFromToken(token);
             String username = jwtUtil.getUsernameFromToken(token);
 
-            // 获取房间信息（用于获取roomId）
-            RoomResponse room = roomService.getRoomByCode(roomCode);
-            String roomId = room.getRoomId().toString();
+            // 获取房间信息（用于获取roomCode）
+            RoomResponse room = roomService.getRoomById(roomId);
+            String roomCode = room.getRoomCode();
 
             // 执行离开房间逻辑，获取更新后的玩家列表
             RoomPlayersResponse playersResponse = roomService.leaveRoom(userId, roomCode);
@@ -213,12 +216,12 @@ public class RoomController {
             // 如果房间关闭，广播 ROOM_CLOSED 事件
             if (roomClosed) {
                 Map<String, Object> closedEventData = new HashMap<>();
-                closedEventData.put("roomId", roomId);
+                closedEventData.put("roomId", roomId.toString());
                 closedEventData.put("roomCode", originalRoomCode);
                 closedEventData.put("timestamp", System.currentTimeMillis());
 
                 roomEventController.broadcastRoomEventWithData(
-                    roomId,
+                    roomId.toString(),
                     "ROOM_CLOSED",
                     closedEventData
                 );
@@ -229,13 +232,13 @@ public class RoomController {
             // 如果房主转移，广播 HOST_TRANSFERRED 事件
             if (newHostUsername != null) {
                 Map<String, Object> hostTransferData = new HashMap<>();
-                hostTransferData.put("roomId", roomId);
+                hostTransferData.put("roomId", roomId.toString());
                 hostTransferData.put("newHost", newHostUsername);
                 hostTransferData.put("roomCode", originalRoomCode);
                 hostTransferData.put("timestamp", System.currentTimeMillis());
 
                 roomEventController.broadcastRoomEventWithData(
-                    roomId,
+                    roomId.toString(),
                     "HOST_TRANSFERRED",
                     hostTransferData
                 );
@@ -262,7 +265,7 @@ public class RoomController {
 
             // 广播 PLAYER_LEFT 事件（包含完整玩家列表）
             roomEventController.broadcastRoomEventWithData(
-                roomId,
+                roomId.toString(),
                 "PLAYER_LEFT",
                 eventData
             );
