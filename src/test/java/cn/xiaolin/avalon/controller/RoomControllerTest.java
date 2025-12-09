@@ -505,7 +505,7 @@ class RoomControllerTest {
         String roomId = roomResponse.getRoomId().toString();
 
         // 现在测试获取房间玩家列表
-        mockMvc.perform(get("/api/rooms/{roomId}/players", roomId))
+        mockMvc.perform(get("/api/rooms/{roomId}/room-players", roomId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").value("获取房间玩家列表成功"))
@@ -737,7 +737,7 @@ class RoomControllerTest {
         String roomCode = roomResponse.getRoomCode();
 
         // 现在测试通过代码作为查询参数获取房间玩家列表
-        mockMvc.perform(get("/api/rooms/players")
+        mockMvc.perform(get("/api/rooms/room-players")
                         .param("roomCode", roomCode))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -759,7 +759,7 @@ class RoomControllerTest {
     @Test
     void whenUserGetsRoomPlayersByInvalidCode_thenReturnsError() throws Exception {
         // 使用无效代码获取房间玩家列表
-        mockMvc.perform(get("/api/rooms/players")
+        mockMvc.perform(get("/api/rooms/room-players")
                         .param("roomCode", "INVALID"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false));
@@ -954,7 +954,7 @@ class RoomControllerTest {
         JoinRoomRequest joinRequest = new JoinRoomRequest();
         joinRequest.setRoomCode(roomCode);
 
-        mockMvc.perform(post("/api/rooms/room-players")
+        mockMvc.perform(post("/api/room-players")
                         .header("Authorization", secondAuthorizationHeader)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(joinRequest)))
@@ -1010,10 +1010,11 @@ class RoomControllerTest {
                         .content(objectMapper.writeValueAsString(joinRequest)))
                 .andExpect(status().isOk());
 
-        // TODO: 获取roomPlayerId用于删除操作
+        // 注意：这个测试需要获取roomPlayerId用于删除操作
         // 由于需要获取roomPlayerId，这个测试需要在RoomPlayerRepository中添加查询方法
         // 或者在joinRoom响应中返回roomPlayerId
         
         // 这里暂时跳过具体实现，实际项目中需要完善
+        // 在RoomPlayerController实现完善后，需要更新此测试用例
     }
 }

@@ -316,5 +316,7 @@
   
 - **离开房间**：更新RoomPlayer资源状态
   - `DELETE /api/room-players/{roomPlayerId}` 将玩家标记为非活跃状态
+  
+注意：这些端点现在位于独立的RoomPlayerController中，而不是RoomController的子资源。
 
 这种设计更符合RESTful的资源状态转移理念，将房间和玩家关系作为独立的资源进行管理，使API语义更加清晰。

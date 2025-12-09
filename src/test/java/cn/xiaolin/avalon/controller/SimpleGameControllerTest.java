@@ -439,7 +439,7 @@ class SimpleGameControllerTest {
             .andExpect(status().isOk());
         
         // 获取房间中的所有玩家ID
-        String playersResponseStr = mockMvc.perform(get("/api/rooms/{roomId}/players", roomId))
+        String playersResponseStr = mockMvc.perform(get("/api/rooms/{roomId}/room-players", roomId))
                 .andExpect(status().isOk())
                 .andReturn()
                 .getResponse()
@@ -538,7 +538,7 @@ class SimpleGameControllerTest {
             .andExpect(status().isOk());
         
         // 获取房间中的所有玩家ID
-        String playersResponseStr = mockMvc.perform(get("/api/rooms/{roomId}/players", roomId))
+        String playersResponseStr = mockMvc.perform(get("/api/rooms/{roomId}/room-players", roomId))
                 .andExpect(status().isOk())
                 .andReturn()
                 .getResponse()
@@ -637,7 +637,7 @@ class SimpleGameControllerTest {
             .andExpect(status().isOk());
         
         // 队长提议队伍
-        String playersResponseStr = mockMvc.perform(get("/api/rooms/{roomId}/players", roomId))
+        String playersResponseStr = mockMvc.perform(get("/api/rooms/{roomId}/room-players", roomId))
                 .andExpect(status().isOk())
                 .andReturn()
                 .getResponse()
@@ -722,7 +722,7 @@ class SimpleGameControllerTest {
             .andExpect(status().isOk());
         
         // 队长提议队伍
-        String playersResponseStr = mockMvc.perform(get("/api/rooms/{roomId}/players", roomId))
+        String playersResponseStr = mockMvc.perform(get("/api/rooms/{roomId}/room-players", roomId))
                 .andExpect(status().isOk())
                 .andReturn()
                 .getResponse()
@@ -814,7 +814,7 @@ class SimpleGameControllerTest {
             .andExpect(status().isOk());
         
         // 队长提议队伍
-        String playersResponseStr = mockMvc.perform(get("/api/rooms/{roomId}/players", roomId))
+        String playersResponseStr = mockMvc.perform(get("/api/rooms/{roomId}/room-players", roomId))
                 .andExpect(status().isOk())
                 .andReturn()
                 .getResponse()
@@ -922,7 +922,7 @@ class SimpleGameControllerTest {
             .andExpect(status().isOk());
         
         // 队长提议队伍
-        String playersResponseStr = mockMvc.perform(get("/api/rooms/{roomId}/players", roomId))
+        String playersResponseStr = mockMvc.perform(get("/api/rooms/{roomId}/room-players", roomId))
                 .andExpect(status().isOk())
                 .andReturn()
                 .getResponse()
@@ -1025,7 +1025,7 @@ class SimpleGameControllerTest {
             .andExpect(status().isOk());
         
         // 获取房间中的所有玩家ID
-        String playersResponseStr = mockMvc.perform(get("/api/rooms/{roomId}/players", roomId))
+        String playersResponseStr = mockMvc.perform(get("/api/rooms/{roomId}/room-players", roomId))
                 .andExpect(status().isOk())
                 .andReturn()
                 .getResponse()
@@ -1169,7 +1169,7 @@ class SimpleGameControllerTest {
             .andExpect(status().isOk());
         
         // 获取房间中的所有玩家ID
-        String playersResponseStr = mockMvc.perform(get("/api/rooms/{roomId}/players", roomId))
+        String playersResponseStr = mockMvc.perform(get("/api/rooms/{roomId}/room-players", roomId))
                 .andExpect(status().isOk())
                 .andReturn()
                 .getResponse()

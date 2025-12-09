@@ -173,7 +173,7 @@ class FivePlayerGameControllerTest {
                 .andExpect(status().isOk());
 
         // 获取房间中的所有玩家ID
-        String playersResponseStr = mockMvc.perform(get("/api/rooms/{roomId}/players", roomId)
+        String playersResponseStr = mockMvc.perform(get("/api/rooms/{roomId}/room-players", roomId)
                 .header("Authorization", authorizationHeader))
                 .andExpect(status().isOk())
                 .andReturn()
@@ -320,7 +320,7 @@ class FivePlayerGameControllerTest {
                 .andExpect(status().isOk());
 
         // 获取房间中的所有玩家ID
-        String playersResponseStr = mockMvc.perform(get("/api/rooms/{roomId}/players", roomId)
+        String playersResponseStr = mockMvc.perform(get("/api/rooms/{roomId}/room-players", roomId)
                 .header("Authorization", authorizationHeader))
                 .andExpect(status().isOk())
                 .andReturn()
@@ -520,7 +520,7 @@ class FivePlayerGameControllerTest {
                 .andExpect(status().isOk());
 
         // 获取房间中的所有玩家ID
-        String playersResponseStr = mockMvc.perform(get("/api/rooms/{roomId}/players", roomId)
+        String playersResponseStr = mockMvc.perform(get("/api/rooms/{roomId}/room-players", roomId)
                 .header("Authorization", authorizationHeader))
                 .andExpect(status().isOk())
                 .andReturn()
@@ -667,7 +667,7 @@ class FivePlayerGameControllerTest {
                 .andExpect(status().isOk());
 
         // 获取房间中的所有玩家ID
-        String playersResponseStr = mockMvc.perform(get("/api/rooms/{roomId}/players", roomId)
+        String playersResponseStr = mockMvc.perform(get("/api/rooms/{roomId}/room-players", roomId)
                 .header("Authorization", authorizationHeader))
                 .andExpect(status().isOk())
                 .andReturn()
@@ -813,7 +813,7 @@ class FivePlayerGameControllerTest {
                 .andExpect(status().isOk());
 
         // 获取房间中的所有玩家ID
-        String playersResponseStr = mockMvc.perform(get("/api/rooms/{roomId}/players", roomId)
+        String playersResponseStr = mockMvc.perform(get("/api/rooms/{roomId}/room-players", roomId)
                 .header("Authorization", authorizationHeader))
                 .andExpect(status().isOk())
                 .andReturn()
