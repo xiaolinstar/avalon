@@ -2,6 +2,7 @@ package cn.xiaolin.avalon.controller;
 
 import cn.xiaolin.avalon.dto.Result;
 import cn.xiaolin.avalon.dto.CreateRoomRequest;
+import cn.xiaolin.avalon.dto.JoinRoomRequest;
 import cn.xiaolin.avalon.dto.RoomResponse;
 import cn.xiaolin.avalon.entity.User;
 import cn.xiaolin.avalon.repository.GamePlayerRepository;
@@ -701,5 +702,217 @@ class RoomControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
+    }
+    
+    /**
+     * ROOM-GET-TC-005: 通过房间代码获取房间玩家列表
+     * 测试目的: 验证可以通过房间代码正确获取房间玩家列表
+     * 前置条件: 房间已存在
+     * 请求方法/URL: GET /api/rooms/players?roomCode={roomCode}
+     * 预期响应: Status Code: 200 OK, success: true, message: "获取房间玩家列表成功"
+     * 实际响应验证点:
+     * 1. 响应体中 success 为 true
+     * 2. players 数组长度为 1（创建者是唯一玩家）
+     * 数据库验证: room_players 表中存在对应房间的玩家记录
+     */
+    @Test
+    void whenUserGetsRoomPlayersByValidCodeAsQueryParam_thenReturnsPlayersList() throws Exception {
+        // 首先创建一个房间
+        CreateRoomRequest createRequest = new CreateRoomRequest();
+        createRequest.setMaxPlayers(5);
+
+        String responseStr = mockMvc.perform(post("/api/rooms")
+                        .header("Authorization", authorizationHeader)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createRequest)))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        // 解析响应以获取房间代码
+        Result<RoomResponse> Result = objectMapper.readValue(responseStr,
+                TypeFactory.defaultInstance().constructParametricType(Result.class, RoomResponse.class));
+        RoomResponse roomResponse = Result.getData();
+        String roomCode = roomResponse.getRoomCode();
+
+        // 现在测试通过代码作为查询参数获取房间玩家列表
+        mockMvc.perform(get("/api/rooms/players")
+                        .param("roomCode", roomCode))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("获取房间玩家列表成功"))
+                .andExpect(jsonPath("$.data.players").isArray())
+                .andExpect(jsonPath("$.data.players.length()").value(1)); // 创建者是唯一玩家
+    }
+    
+    /**
+     * ROOM-GET-TC-006: 通过无效房间代码获取房间玩家列表
+     * 测试目的: 验证通过无效房间代码无法获取房间玩家列表
+     * 前置条件: 无
+     * 请求方法/URL: GET /api/rooms/players?roomCode=INVALID
+     * 预期响应: Status Code: 400 Bad Request, success: false
+     * 实际响应验证点:
+     * 1. 响应体中 success 为 false
+     * 数据库验证: rooms 表中不存在代码为 INVALID 的房间记录
+     */
+    @Test
+    void whenUserGetsRoomPlayersByInvalidCode_thenReturnsError() throws Exception {
+        // 使用无效代码获取房间玩家列表
+        mockMvc.perform(get("/api/rooms/players")
+                        .param("roomCode", "INVALID"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+    
+    /**
+     * ROOM-JOIN-TC-003: 通过房间代码加入房间
+     * 测试目的: 验证用户可以通过房间代码成功加入房间
+     * 前置条件: 房间已存在
+     * 请求方法/URL: POST /api/rooms/join
+     * 请求体: {"roomCode": "ABC123"}
+     * 预期响应: Status Code: 200 OK, success: true, message: "加入房间成功"
+     * 实际响应验证点:
+     * 1. 响应体中 success 为 true
+     * 2. 返回的房间信息正确
+     * 数据库验证: room_players 表中新增一条玩家记录
+     * WebSocket 验证: /topic/room/{roomId} 主题上应广播一条 PLAYER_JOINED 事件消息
+     */
+    @Test
+    void whenUserJoinsRoomByValidCode_thenReturnsSuccess() throws Exception {
+        // 首先创建一个房间
+        CreateRoomRequest createRequest = new CreateRoomRequest();
+        createRequest.setMaxPlayers(5);
+
+        String responseStr = mockMvc.perform(post("/api/rooms")
+                        .header("Authorization", authorizationHeader)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createRequest)))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        // 解析响应以获取房间代码
+        Result<RoomResponse> createResult = objectMapper.readValue(responseStr,
+                TypeFactory.defaultInstance().constructParametricType(Result.class, RoomResponse.class));
+        RoomResponse roomResponse = createResult.getData();
+        String roomCode = roomResponse.getRoomCode();
+
+        // 第二个用户通过房间代码加入房间
+        JoinRoomRequest joinRequest = new JoinRoomRequest();
+        joinRequest.setRoomCode(roomCode);
+
+        mockMvc.perform(post("/api/rooms/join")
+                        .header("Authorization", secondAuthorizationHeader)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(joinRequest)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("加入房间成功"))
+                .andExpect(jsonPath("$.data.roomCode").value(roomCode));
+
+        // 验证WebSocket消息已发送
+        verify(roomEventController, atLeastOnce()).broadcastRoomEvent(anyString(), anyString(), anyString(), anyString());
+    }
+    
+    /**
+     * ROOM-JOIN-TC-004: 通过无效房间代码加入房间
+     * 测试目的: 验证用户无法通过无效房间代码加入房间
+     * 前置条件: 无
+     * 请求方法/URL: POST /api/rooms/join
+     * 请求体: {"roomCode": "INVALID"}
+     * 预期响应: Status Code: 400 Bad Request, success: false
+     * 实际响应验证点:
+     * 1. 响应体中 success 为 false
+     * 数据库验证: room_players 表中无新增记录
+     */
+    @Test
+    void whenUserJoinsRoomByInvalidCode_thenReturnsError() throws Exception {
+        // 使用无效代码加入房间
+        JoinRoomRequest joinRequest = new JoinRoomRequest();
+        joinRequest.setRoomCode("INVALID");
+
+        mockMvc.perform(post("/api/rooms/join")
+                        .header("Authorization", authorizationHeader)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(joinRequest)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+    
+    /**
+     * ROOM-LEAVE-TC-003: 通过房间代码离开房间
+     * 测试目的: 验证用户可以通过房间代码成功离开房间
+     * 前置条件: 用户已在房间中
+     * 请求方法/URL: DELETE /api/rooms/leave?roomCode=ABC123
+     * 预期响应: Status Code: 200 OK, success: true, message: "离开房间成功"
+     * 实际响应验证点:
+     * 1. 响应体中 success 为 true
+     * 数据库验证: room_players 表中玩家记录的 isActive 字段变为 false
+     * WebSocket 验证: /topic/room/{roomId} 主题上应广播一条 PLAYER_LEFT 事件消息
+     */
+    @Test
+    void whenUserLeavesRoomByValidCode_thenReturnsSuccess() throws Exception {
+        // 首先创建一个房间
+        CreateRoomRequest createRequest = new CreateRoomRequest();
+        createRequest.setMaxPlayers(5);
+
+        String responseStr = mockMvc.perform(post("/api/rooms")
+                        .header("Authorization", authorizationHeader)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createRequest)))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        // 解析响应以获取房间信息
+        Result<RoomResponse> createResult = objectMapper.readValue(responseStr,
+                TypeFactory.defaultInstance().constructParametricType(Result.class, RoomResponse.class));
+        RoomResponse roomResponse = createResult.getData();
+        String roomCode = roomResponse.getRoomCode();
+        String roomId = roomResponse.getRoomId().toString();
+
+        // 第二个用户加入房间
+        JoinRoomRequest joinRequest = new JoinRoomRequest();
+        joinRequest.setRoomCode(roomCode);
+
+        mockMvc.perform(post("/api/rooms/join")
+                        .header("Authorization", secondAuthorizationHeader)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(joinRequest)))
+                .andExpect(status().isOk());
+
+        // 现在测试通过房间代码离开房间
+        mockMvc.perform(delete("/api/rooms/leave")
+                        .header("Authorization", secondAuthorizationHeader)
+                        .param("roomCode", roomCode))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("离开房间成功"));
+
+        // 验证WebSocket消息已发送
+        verify(roomEventController, atLeastOnce()).broadcastRoomEventWithData(anyString(), anyString(), anyMap());
+    }
+    
+    /**
+     * ROOM-LEAVE-TC-004: 通过无效房间代码离开房间
+     * 测试目的: 验证用户无法通过无效房间代码离开房间
+     * 前置条件: 无
+     * 请求方法/URL: DELETE /api/rooms/leave?roomCode=INVALID
+     * 预期响应: Status Code: 400 Bad Request, success: false
+     * 实际响应验证点:
+     * 1. 响应体中 success 为 false
+     * 数据库验证: 无相关操作
+     */
+    @Test
+    void whenUserLeavesRoomByInvalidCode_thenReturnsError() throws Exception {
+        // 使用无效代码离开房间
+        mockMvc.perform(delete("/api/rooms/leave")
+                        .header("Authorization", authorizationHeader)
+                        .param("roomCode", "INVALID"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
     }
 }

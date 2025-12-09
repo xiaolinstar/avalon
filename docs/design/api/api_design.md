@@ -146,11 +146,24 @@
 
 ### 加入房间
 
-| 名称   | 请求方法 | 路径                         | 说明     |
-| ---- | ---- | -------------------------- | ------ |
-| 加入房间 | POST | `/api/rooms/{roomId}/join` | 玩家加入房间 |
+| 名称       | 请求方法 | 路径                               | 说明               |
+| -------- | ---- | -------------------------------- | ---------------- |
+| 加入房间     | POST | `/api/rooms/{roomId}/join`        | 通过房间ID加入房间       |
+| 加入房间     | POST | `/api/rooms/join`                 | 通过房间代码加入房间      |
 
-请求参数：无（路径参数 `roomId`）
+请求体（Content-Type: application/json）：
+
+```json
+{
+  "roomCode": "A3B9C1"
+}
+```
+
+请求参数：
+
+| 参数名      | 参数类型   | 是否必需 | 描述     |
+| -------- | ------ | ---- | ------ |
+| roomCode | string | 是    | 房间代码   |
 
 响应体（200 OK）：
 
@@ -164,11 +177,12 @@
 
 ### 获取房间信息
 
-| 名称   | 请求方法 | 路径                    | 说明     |
-| ---- | ---- | --------------------- | ------ |
-| 房间信息 | GET  | `/api/rooms/{roomId}` | 获取房间详情 |
+| 名称   | 请求方法 | 路径                               | 说明               |
+| ---- | ---- | -------------------------------- | ---------------- |
+| 房间信息 | GET  | `/api/rooms?roomCode={roomCode}` | 根据房间代码获取房间详情   |
+| 房间信息 | GET  | `/api/rooms/{roomId}`            | 根据房间ID获取房间详情    |
 
-请求参数：无（路径参数 `roomId`）
+请求参数：`roomCode`（查询参数，房间代码）
 
 响应体（200 OK）：
 
@@ -185,6 +199,60 @@
   ],
   "status": "WAITING",
   "createdAt": "2025-11-17T12:34:56Z"
+}
+```
+
+### 获取房间玩家列表
+
+| 名称       | 请求方法 | 路径                                          | 说明                 |
+| -------- | ---- | ------------------------------------------- | ------------------ |
+| 房间玩家列表 | GET  | `/api/rooms/players?roomCode={roomCode}`    | 根据房间代码获取房间玩家列表   |
+| 房间玩家列表 | GET  | `/api/rooms/{roomId}/players`               | 根据房间ID获取房间玩家列表    |
+
+请求参数：`roomCode`（查询参数，房间代码）
+
+响应体（200 OK）：
+
+```json
+{
+  "roomCode": "A3B9C1",
+  "players": [
+    { 
+      "playerId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "nickname": "merlin",
+      "role": "MERLIN",
+      "alignment": "GOOD",
+      "isHost": true,
+      "seatNumber": 1,
+      "isActive": true
+    },
+    { 
+      "playerId": "f9e8d7c6-5432-1098-7654-321098765432",
+      "nickname": "morgana",
+      "role": "MORGANA",
+      "alignment": "EVIL",
+      "isHost": false,
+      "seatNumber": 2,
+      "isActive": true
+    }
+  ]
+}
+```
+
+### 离开房间
+
+| 名称     | 请求方法  | 路径                                 | 说明               |
+| ------ | ----- | ---------------------------------- | ---------------- |
+| 离开房间   | DELETE | `/api/rooms/{roomId}`              | 通过房间ID离开房间      |
+| 离开房间   | DELETE | `/api/rooms/leave?roomCode={roomCode}` | 通过房间代码离开房间     |
+
+请求参数：`roomCode`（查询参数，房间代码）
+
+响应体（200 OK）：
+
+```json
+{
+  "message": "离开房间成功"
 }
 ```
 
