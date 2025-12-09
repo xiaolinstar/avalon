@@ -150,6 +150,7 @@
 | -------- | ---- | -------------------------------- | ---------------- |
 | 加入房间     | POST | `/api/rooms/{roomId}/join`        | 通过房间ID加入房间       |
 | 加入房间     | POST | `/api/rooms/join`                 | 通过房间代码加入房间      |
+| 加入房间     | POST | `/api/room-players`               | RESTful风格创建房间玩家关系 |
 
 请求体（Content-Type: application/json）：
 
@@ -245,8 +246,11 @@
 | ------ | ----- | ---------------------------------- | ---------------- |
 | 离开房间   | DELETE | `/api/rooms/{roomId}`              | 通过房间ID离开房间      |
 | 离开房间   | DELETE | `/api/rooms/leave?roomCode={roomCode}` | 通过房间代码离开房间     |
+| 离开房间   | DELETE | `/api/room-players/{roomPlayerId}` | RESTful风格删除房间玩家关系 |
 
-请求参数：`roomCode`（查询参数，房间代码）
+请求参数：
+- `roomCode`（查询参数，房间代码）
+- `roomPlayerId`（路径参数，房间玩家ID）
 
 响应体（200 OK）：
 
@@ -293,3 +297,24 @@
 @PreAuthorize("hasRole(#gameId, 'ASSASSIN')") // 仅刺客
 @PreAuthorize("isPlayer(#gameId)")      // 任意局内玩家
 ```
+
+## 8. RESTful设计原则说明
+
+本系统API设计遵循RESTful架构原则，特别体现在房间玩家关系的管理上：
+
+### 资源定义
+
+1. **Room（房间）**：代表游戏房间本身，是持久化的资源
+2. **RoomPlayer（房间玩家关系）**：代表玩家与房间之间的关系，是一个独立的资源
+
+### 状态转移
+
+加入房间和离开房间操作被设计为RoomPlayer资源的状态转移：
+
+- **加入房间**：创建或激活RoomPlayer资源
+  - `POST /api/room-players` 创建新的房间玩家关系或重新激活已存在的关系
+  
+- **离开房间**：更新RoomPlayer资源状态
+  - `DELETE /api/room-players/{roomPlayerId}` 将玩家标记为非活跃状态
+
+这种设计更符合RESTful的资源状态转移理念，将房间和玩家关系作为独立的资源进行管理，使API语义更加清晰。
